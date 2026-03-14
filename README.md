@@ -27,25 +27,27 @@ CloudCart CLI lets you **query, explore, and manage** your CloudCart store direc
 - **AI-First Design** — Structured output, self-describing commands, and LLM context built in
 - **Monorepo Architecture** — Extensible package structure for apps, themes, and more
 
-## Before You Begin
-
-- [Node.js](https://nodejs.org/) v20.0.0 or higher
-- [pnpm](https://pnpm.io/) v9 or higher
-
 ## Install
 
+### Homebrew
+
 ```bash
-# npm
+brew tap cloudcart/tap
+brew install cloudcart
+```
+
+### npm / pnpm / yarn / bun
+
+```bash
 npm install -g @cloudcart/cli@latest
-
-# pnpm
 pnpm add -g @cloudcart/cli@latest
-
-# yarn
 yarn global add @cloudcart/cli@latest
+bun add -g @cloudcart/cli@latest
 ```
 
 ### From source
+
+Requires [Node.js](https://nodejs.org/) v20+ and [pnpm](https://pnpm.io/) v9+.
 
 ```bash
 git clone https://github.com/cloudcart/cli.git
