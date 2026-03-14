@@ -28,6 +28,12 @@ jobs:
       - run: pnpm build
       - run: pnpm test
 
+      - name: Replace workspace:* with actual versions
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          find packages -name 'package.json' -not -path '*/node_modules/*' \
+            -exec sed -i "s|\"workspace:\*\"|\"^${VERSION}\"|g" {} +
+
       - name: Publish @cloudcart/cli-kit
         run: cd packages/cli-kit && npm publish --access public --provenance
 

@@ -1,6 +1,6 @@
 {
   "name": "@cloudcart/app",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "CloudCart app development commands",
   "license": "MIT",
   "type": "module",
