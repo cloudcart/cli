@@ -9,9 +9,13 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/cloudcart/cli/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT"></a>
-  <a href="https://github.com/cloudcart/cli/releases"><img src="https://img.shields.io/github/v/release/cloudcart/cli" alt="Latest Release"></a>
+  <a href="https://www.npmjs.com/package/@cloudcart/cli"><img src="https://img.shields.io/npm/v/@cloudcart/cli.svg" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/@cloudcart/cli"><img src="https://img.shields.io/npm/dm/@cloudcart/cli.svg" alt="npm downloads"></a>
   <a href="https://github.com/cloudcart/cli/actions/workflows/ci.yml"><img src="https://github.com/cloudcart/cli/actions/workflows/ci.yml/badge.svg" alt="CloudCart CLI"></a>
+  <a href="https://github.com/cloudcart/cli/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT"></a>
+  <img src="https://img.shields.io/badge/Node.js-≥20-339933?logo=node.js&logoColor=white" alt="Node.js">
+  <img src="https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
+  <a href="https://github.com/cloudcart/cli/issues"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
 </p>
 
 ---
