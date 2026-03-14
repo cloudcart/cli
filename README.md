@@ -10,8 +10,7 @@
 
 <p align="center">
   <a href="https://www.npmjs.com/package/@cloudcart/cli"><img src="https://img.shields.io/npm/v/@cloudcart/cli.svg" alt="npm version"></a>
-  <a href="https://www.npmjs.com/package/@cloudcart/cli"><img src="https://img.shields.io/npm/dm/@cloudcart/cli.svg" alt="npm downloads"></a>
-  <a href="https://github.com/cloudcart/cli/actions/workflows/ci.yml"><img src="https://github.com/cloudcart/cli/actions/workflows/ci.yml/badge.svg" alt="CloudCart CLI"></a>
+<a href="https://github.com/cloudcart/cli/actions/workflows/ci.yml"><img src="https://github.com/cloudcart/cli/actions/workflows/ci.yml/badge.svg" alt="CloudCart CLI"></a>
   <a href="https://github.com/cloudcart/cli/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT"></a>
   <img src="https://img.shields.io/badge/Node.js-≥20-339933?logo=node.js&logoColor=white" alt="Node.js">
   <img src="https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
