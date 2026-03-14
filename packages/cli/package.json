@@ -1,6 +1,6 @@
 {
   "name": "@cloudcart/cli",
-  "version": "0.1.2",
+  "version": "0.1.4",
   "description": "CloudCart Developer CLI",
   "license": "MIT",
   "type": "module",
