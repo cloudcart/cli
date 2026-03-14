@@ -28,20 +28,12 @@ jobs:
 
       - name: Publish @cloudcart/cli-kit
         run: cd packages/cli-kit && npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @cloudcart/app
         run: cd packages/app && npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @cloudcart/theme
         run: cd packages/theme && npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish @cloudcart/cli
         run: cd packages/cli && npm publish --access public --ignore-scripts --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
