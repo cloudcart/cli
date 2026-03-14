@@ -1,8 +1,12 @@
 import { Command } from '@oclif/core';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const { version } = require('../../package.json');
 
 const CLI_DESCRIPTION = {
   name: 'cloudcart',
-  version: '0.1.0',
+  version,
   description: 'CloudCart Developer CLI — manage stores, themes, and apps via GraphQL Admin API',
   auth: {
     env_vars: {

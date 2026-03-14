@@ -20,7 +20,7 @@ describe('Describe command', () => {
     expect(logs.length).toBe(1);
     const parsed = JSON.parse(logs[0]);
     expect(parsed.name).toBe('cloudcart');
-    expect(parsed.version).toBe('0.1.0');
+    expect(parsed.version).toMatch(/^\d+\.\d+\.\d+/);
   });
 
   it('includes all command descriptions', async () => {
