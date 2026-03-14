@@ -35,6 +35,19 @@ CloudCart CLI lets you **query, explore, and manage** your CloudCart store direc
 ## Install
 
 ```bash
+# npm
+npm install -g @cloudcart/cli@latest
+
+# pnpm
+pnpm add -g @cloudcart/cli@latest
+
+# yarn
+yarn global add @cloudcart/cli@latest
+```
+
+### From source
+
+```bash
 git clone https://github.com/cloudcart/cli.git
 cd cli
 pnpm install

@@ -35,5 +35,11 @@
       "target": "./dist/commands"
     }
   },
+  "publishConfig": { "access": "public" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cloudcart/cli.git",
+    "directory": "packages/app"
+  },
   "engines": { "node": ">=20.0.0" }
 }

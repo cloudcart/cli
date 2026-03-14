@@ -64,5 +64,11 @@
     "typescript": "^5.7.3",
     "vitest": "^3.0.4"
   },
+  "publishConfig": { "access": "public" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cloudcart/cli.git",
+    "directory": "packages/cli-kit"
+  },
   "engines": { "node": ">=20.0.0" }
 }

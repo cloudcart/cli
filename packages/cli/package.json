@@ -52,5 +52,11 @@
     ],
     "topicSeparator": " "
   },
+  "publishConfig": { "access": "public" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cloudcart/cli.git",
+    "directory": "packages/cli"
+  },
   "engines": { "node": ">=20.0.0" }
 }
