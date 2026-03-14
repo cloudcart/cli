@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://cloudcart.com/images/logo.svg" alt="CloudCart" width="300" />
+  <img src="https://assets.cloudcart.com/gate/dist/images/logo.svg" alt="CloudCart" width="300" />
 </p>
 
 <h1 align="center">CloudCart CLI</h1>
@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://github.com/cloudcart/cli/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License: MIT"></a>
   <a href="https://github.com/cloudcart/cli/releases"><img src="https://img.shields.io/github/v/release/cloudcart/cli" alt="Latest Release"></a>
-  <a href="https://github.com/cloudcart/cli/actions"><img src="https://img.shields.io/github/actions/workflow/status/cloudcart/cli/ci.yml?branch=main" alt="CI"></a>
+
 </p>
 
 ---
