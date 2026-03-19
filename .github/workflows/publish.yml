@@ -43,6 +43,9 @@ jobs:
       - name: Publish @cloudcart/theme
         run: cd packages/theme && npm publish --access public --provenance
 
+      - name: Publish @cloudcart/nitro-plugin
+        run: cd packages/nitro && npm publish --access public --provenance
+
       - name: Publish @cloudcart/cli
         run: cd packages/cli && npm publish --access public --ignore-scripts --provenance
 
