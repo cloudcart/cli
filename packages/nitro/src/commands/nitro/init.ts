@@ -312,7 +312,20 @@ import {reactRouter} from '@react-router/dev/vite';
 import tsconfigPaths from 'vite-tsconfig-paths';
 
 export default defineConfig({
-  plugins: [reactRouter(), tsconfigPaths()],
+  plugins: [
+    {
+      name: 'nitro-worker-entry',
+      config(_, env) {
+        return {
+          ...(env.isSsrBuild && {
+            build: {ssr: './server'},
+          }),
+        };
+      },
+    },
+    reactRouter(),
+    tsconfigPaths(),
+  ],
   build: {assetsInlineLimit: 0},
   ssr: {
     noExternal: true,
