@@ -177,9 +177,9 @@ export default class NitroInit extends Command {
       version: '0.0.0',
       type: 'module',
       scripts: {
-        build: 'cloudcart nitro build',
-        dev: 'cloudcart nitro dev',
-        preview: 'cloudcart nitro preview',
+        build: 'react-router build',
+        dev: 'react-router dev',
+        preview: 'vite preview',
         typecheck: 'react-router typegen && tsc --noEmit',
       },
       dependencies: {
@@ -193,7 +193,6 @@ export default class NitroInit extends Command {
       devDependencies: {
         '@react-router/dev': '^7.12.0',
         '@react-router/fs-routes': '^7.12.0',
-        '@react-router/node': '^7.12.0',
         ...(language === 'ts' ? {
           '@types/react': '^19.1.0',
           '@types/react-dom': '^19.1.0',
@@ -315,7 +314,14 @@ import tsconfigPaths from 'vite-tsconfig-paths';
 export default defineConfig({
   plugins: [reactRouter(), tsconfigPaths()],
   build: {assetsInlineLimit: 0},
-  ssr: {optimizeDeps: {include: ['react-router']}},
+  ssr: {
+    noExternal: true,
+    target: 'webworker',
+    resolve: {conditions: ['worker', 'workerd']},
+    optimizeDeps: {
+      include: ['react', 'react/jsx-runtime', 'react/jsx-dev-runtime', 'react-dom', 'react-dom/server', 'react-router'],
+    },
+  },
 });
 `;
 
@@ -334,25 +340,41 @@ build
 .cloudcart/
 `;
 
-const SERVER_TS = `import {createRequestListener} from '@react-router/node';
+const SERVER_TS = `import {createRequestHandler} from 'react-router';
 import {createNitroContext} from '@cloudcart/nitro';
 
-export default createRequestListener({
+const handler = createRequestHandler(
   // @ts-expect-error — virtual module
-  build: () => import('virtual:react-router/server-build'),
-  mode: process.env.NODE_ENV,
-  getLoadContext: async (request) => {
-    return createNitroContext({
-      request,
-      env: {
-        SESSION_SECRET: process.env.SESSION_SECRET ?? 'nitro-dev-secret',
-        PUBLIC_STORE_DOMAIN: process.env.PUBLIC_STORE_DOMAIN,
-        PUBLIC_STOREFRONT_API_TOKEN: process.env.PUBLIC_STOREFRONT_API_TOKEN,
-        PRIVATE_STOREFRONT_API_TOKEN: process.env.PRIVATE_STOREFRONT_API_TOKEN,
-      },
-    });
+  () => import('virtual:react-router/server-build'),
+  'production',
+);
+
+export default {
+  async fetch(request, env) {
+    try {
+      const context = await createNitroContext({
+        request,
+        env: {
+          SESSION_SECRET: env.SESSION_SECRET ?? 'nitro-dev-secret',
+          PUBLIC_STORE_DOMAIN: env.PUBLIC_STORE_DOMAIN,
+          PUBLIC_STOREFRONT_API_TOKEN: env.PUBLIC_STOREFRONT_API_TOKEN,
+          PRIVATE_STOREFRONT_API_TOKEN: env.PRIVATE_STOREFRONT_API_TOKEN,
+        },
+      });
+
+      const response = await handler(request, context);
+
+      if (context.session.isPending) {
+        response.headers.set('Set-Cookie', await context.session.commit());
+      }
+
+      return response;
+    } catch (error) {
+      console.error(error);
+      return new Response('An unexpected error occurred', {status: 500});
+    }
   },
-});
+};
 `;
 
 const ROUTES_TS = `import {type RouteConfig} from '@react-router/dev/routes';
