@@ -1,6 +1,6 @@
 {
   "name": "@cloudcart/nitro-plugin",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "CloudCart Nitro storefront commands",
   "license": "MIT",
   "type": "module",

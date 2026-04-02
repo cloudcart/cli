@@ -1,6 +1,6 @@
 {
   "name": "@cloudcart/cli-kit",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "CloudCart CLI shared foundation library",
   "license": "MIT",
   "type": "module",

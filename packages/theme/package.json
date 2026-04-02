@@ -1,6 +1,6 @@
 {
   "name": "@cloudcart/theme",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "CloudCart theme development commands",
   "license": "MIT",
   "type": "module",
