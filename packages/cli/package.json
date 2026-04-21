@@ -1,6 +1,6 @@
 {
   "name": "@cloudcart/cli",
-  "version": "0.3.0",
+  "version": "0.3.2",
   "description": "CloudCart Developer CLI",
   "license": "MIT",
   "type": "module",
@@ -9,7 +9,11 @@
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["bin", "dist", "oclif.manifest.json"],
+  "files": [
+    "bin",
+    "dist",
+    "oclif.manifest.json"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -54,11 +58,15 @@
     ],
     "topicSeparator": " "
   },
-  "publishConfig": { "access": "public" },
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/cloudcart/cli.git",
     "directory": "packages/cli"
   },
-  "engines": { "node": ">=20.0.0" }
+  "engines": {
+    "node": ">=20.0.0"
+  }
 }

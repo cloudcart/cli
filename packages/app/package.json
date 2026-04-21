@@ -1,12 +1,14 @@
 {
   "name": "@cloudcart/app",
-  "version": "0.3.0",
+  "version": "0.3.2",
   "description": "CloudCart app development commands",
   "license": "MIT",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -35,11 +37,15 @@
       "target": "./dist/commands"
     }
   },
-  "publishConfig": { "access": "public" },
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/cloudcart/cli.git",
     "directory": "packages/app"
   },
-  "engines": { "node": ">=20.0.0" }
+  "engines": {
+    "node": ">=20.0.0"
+  }
 }

@@ -1,12 +1,14 @@
 {
   "name": "@cloudcart/theme",
-  "version": "0.3.0",
+  "version": "0.3.2",
   "description": "CloudCart theme development commands",
   "license": "MIT",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
@@ -29,11 +31,15 @@
     "typescript": "^5.7.3",
     "vitest": "^3.0.4"
   },
-  "publishConfig": { "access": "public" },
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/cloudcart/cli.git",
     "directory": "packages/theme"
   },
-  "engines": { "node": ">=20.0.0" }
+  "engines": {
+    "node": ">=20.0.0"
+  }
 }
