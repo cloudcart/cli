@@ -1,6 +1,6 @@
 {
   "name": "@cloudcart/cli",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "CloudCart Developer CLI",
   "license": "MIT",
   "type": "module",
@@ -30,7 +30,8 @@
     "@cloudcart/nitro-plugin": "workspace:*",
     "@oclif/core": "^4.2.8",
     "@oclif/plugin-help": "^6.2.27",
-    "@oclif/plugin-version": "^2.2.24"
+    "@oclif/plugin-version": "^2.2.24",
+    "@oclif/plugin-warn-if-update-available": "^3.1"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.0.0",
@@ -53,10 +54,15 @@
     "plugins": [
       "@oclif/plugin-help",
       "@oclif/plugin-version",
+      "@oclif/plugin-warn-if-update-available",
       "@cloudcart/app",
       "@cloudcart/nitro-plugin"
     ],
-    "topicSeparator": " "
+    "topicSeparator": " ",
+    "warn-if-update-available": {
+      "timeoutInDays": 7,
+      "message": "<%= config.name %> update available: <%= chalk.greenBright(config.version) %> \u2192 <%= chalk.greenBright(latest) %>.\nRun <%= chalk.cyan('npm i -g @cloudcart/cli@latest') %> to update."
+    }
   },
   "publishConfig": {
     "access": "public"
