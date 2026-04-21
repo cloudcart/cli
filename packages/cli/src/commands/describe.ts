@@ -49,7 +49,7 @@ const CLI_DESCRIPTION = {
       },
       stdin: true,
       examples: [
-        "cloudcart app execute --query '{ products(first:5) { edges { node { id title } } } }' --json",
+        "cloudcart app execute --query '{ products(first:5) { nodes { id name pricing { from to } } totalCount } }' --json",
         "echo '{ shop { name } }' | cloudcart app execute --compact-output",
       ],
     },
