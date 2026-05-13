@@ -35,25 +35,70 @@ jobs:
             -exec sed -i "s|\"workspace:\*\"|\"^${VERSION}\"|g" {} +
 
       - name: Publish @cloudcart/cli-kit
-        run: cd packages/cli-kit && npm publish --access public --provenance
+        working-directory: packages/cli-kit
+        run: |
+          LOCAL=$(node -p "require('./package.json').version")
+          PUBLISHED=$(npm view @cloudcart/cli-kit version 2>/dev/null || true)
+          if [ "$LOCAL" = "$PUBLISHED" ]; then
+            echo "Skipping: @cloudcart/cli-kit@$LOCAL already on npm"
+          else
+            npm publish --access public --provenance
+          fi
 
       - name: Publish @cloudcart/app
-        run: cd packages/app && npm publish --access public --provenance
+        working-directory: packages/app
+        run: |
+          LOCAL=$(node -p "require('./package.json').version")
+          PUBLISHED=$(npm view @cloudcart/app version 2>/dev/null || true)
+          if [ "$LOCAL" = "$PUBLISHED" ]; then
+            echo "Skipping: @cloudcart/app@$LOCAL already on npm"
+          else
+            npm publish --access public --provenance
+          fi
 
       - name: Publish @cloudcart/theme
-        run: cd packages/theme && npm publish --access public --provenance
+        working-directory: packages/theme
+        run: |
+          LOCAL=$(node -p "require('./package.json').version")
+          PUBLISHED=$(npm view @cloudcart/theme version 2>/dev/null || true)
+          if [ "$LOCAL" = "$PUBLISHED" ]; then
+            echo "Skipping: @cloudcart/theme@$LOCAL already on npm"
+          else
+            npm publish --access public --provenance
+          fi
 
       - name: Publish @cloudcart/nitrogen-plugin
-        run: cd packages/nitrogen && npm publish --access public --provenance
+        working-directory: packages/nitrogen
+        run: |
+          LOCAL=$(node -p "require('./package.json').version")
+          PUBLISHED=$(npm view @cloudcart/nitrogen-plugin version 2>/dev/null || true)
+          if [ "$LOCAL" = "$PUBLISHED" ]; then
+            echo "Skipping: @cloudcart/nitrogen-plugin@$LOCAL already on npm"
+          else
+            npm publish --access public --provenance
+          fi
 
       - name: Publish @cloudcart/cli
-        run: cd packages/cli && npm publish --access public --ignore-scripts --provenance
+        working-directory: packages/cli
+        run: |
+          LOCAL=$(node -p "require('./package.json').version")
+          PUBLISHED=$(npm view @cloudcart/cli version 2>/dev/null || true)
+          if [ "$LOCAL" = "$PUBLISHED" ]; then
+            echo "Skipping: @cloudcart/cli@$LOCAL already on npm"
+          else
+            npm publish --access public --ignore-scripts --provenance
+          fi
 
       - name: Update Homebrew formula
         env:
           GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION=$(node -p "require('./packages/cli/package.json').version")
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [ "$VERSION" != "$TAG_VERSION" ]; then
+            echo "Skipping Homebrew update: cli package.json is $VERSION but release tag is $TAG_VERSION (no new cli published)"
+            exit 0
+          fi
           SHA256=$(curl -sL "https://registry.npmjs.org/@cloudcart/cli/-/cli-${VERSION}.tgz" | shasum -a 256 | cut -d' ' -f1)
 
           # Clone tap repo
