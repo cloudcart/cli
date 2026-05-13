@@ -4,29 +4,29 @@ import { existsSync } from 'node:fs';
 import { logger, colors, printBanner } from '@cloudcart/cli-kit';
 import { resolveProjectRoot, readProjectConfig, loadEnvFile } from '../../../lib/project.js';
 
-export default class NitroEnvPush extends Command {
+export default class NitrogenEnvPush extends Command {
   static override description = 'Push local environment variables to a linked CloudCart store';
 
   static override examples = [
-    '<%= config.bin %> nitro env push',
-    '<%= config.bin %> nitro env push --env staging',
+    '<%= config.bin %> nitrogen env push',
+    '<%= config.bin %> nitrogen env push --env staging',
   ];
 
   static override flags = {
-    path: Flags.string({ description: 'Path to the Nitro storefront root', default: '.' }),
+    path: Flags.string({ description: 'Path to the Nitrogen storefront root', default: '.' }),
     env: Flags.string({ description: 'Target environment', default: 'production' }),
     'env-file': Flags.string({ description: 'Source .env file path', default: '.env' }),
   };
 
   async run(): Promise<void> {
-    const { flags } = await this.parse(NitroEnvPush);
+    const { flags } = await this.parse(NitrogenEnvPush);
     const root = resolveProjectRoot(flags.path);
 
     printBanner();
 
     const config = readProjectConfig(root);
     if (!config.store) {
-      logger.error('No store linked. Run `cloudcart nitro link` first.');
+      logger.error('No store linked. Run `cloudcart nitrogen link` first.');
       this.exit(1);
     }
 

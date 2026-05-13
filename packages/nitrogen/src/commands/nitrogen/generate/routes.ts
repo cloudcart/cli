@@ -3,7 +3,7 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { logger, printBanner } from '@cloudcart/cli-kit';
 import { resolveProjectRoot } from '../../../lib/project.js';
-import NitroGenerateRoute from './route.js';
+import NitrogenGenerateRoute from './route.js';
 
 const ALL_ROUTES = [
   'products.$handle',
@@ -17,21 +17,21 @@ const ALL_ROUTES = [
   '[sitemap.xml]',
 ];
 
-export default class NitroGenerateRoutes extends Command {
-  static override description = 'Generate all standard Nitro commerce routes';
+export default class NitrogenGenerateRoutes extends Command {
+  static override description = 'Generate all standard Nitrogen commerce routes';
 
   static override examples = [
-    '<%= config.bin %> nitro generate routes',
-    '<%= config.bin %> nitro generate routes --force',
+    '<%= config.bin %> nitrogen generate routes',
+    '<%= config.bin %> nitrogen generate routes --force',
   ];
 
   static override flags = {
     force: Flags.boolean({ description: 'Overwrite existing routes', default: false }),
-    path: Flags.string({ description: 'Path to the Nitro storefront root', default: '.' }),
+    path: Flags.string({ description: 'Path to the Nitrogen storefront root', default: '.' }),
   };
 
   async run(): Promise<void> {
-    const { flags } = await this.parse(NitroGenerateRoutes);
+    const { flags } = await this.parse(NitrogenGenerateRoutes);
     const root = resolveProjectRoot(flags.path);
 
     printBanner();
@@ -41,7 +41,7 @@ export default class NitroGenerateRoutes extends Command {
     if (!existsSync(routesDir)) mkdirSync(routesDir, { recursive: true });
 
     for (const routeName of ALL_ROUTES) {
-      await NitroGenerateRoute.run([routeName, '--path', root, ...(flags.force ? ['--force'] : [])]);
+      await NitrogenGenerateRoute.run([routeName, '--path', root, ...(flags.force ? ['--force'] : [])]);
     }
 
     console.log();

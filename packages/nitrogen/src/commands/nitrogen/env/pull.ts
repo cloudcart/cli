@@ -13,7 +13,7 @@ interface EnvVar {
 }
 
 interface StorefrontEnvResponse {
-  nitroStorefront: {
+  nitrogenStorefront: {
     id: string;
     name: string;
     novaHostname: string | null;
@@ -24,7 +24,7 @@ interface StorefrontEnvResponse {
 
 const STOREFRONT_ENV_QUERY = `
   query StorefrontEnv($id: ID!) {
-    nitroStorefront(id: $id) {
+    nitrogenStorefront(id: $id) {
       id
       name
       novaHostname
@@ -40,31 +40,31 @@ const STOREFRONT_ENV_QUERY = `
   }
 `;
 
-export default class NitroEnvPull extends Command {
+export default class NitrogenEnvPull extends Command {
   static override description = 'Pull environment variables from a linked CloudCart store';
 
   static override examples = [
-    '<%= config.bin %> nitro env pull',
-    '<%= config.bin %> nitro env pull --env production',
-    '<%= config.bin %> nitro env pull --force',
+    '<%= config.bin %> nitrogen env pull',
+    '<%= config.bin %> nitrogen env pull --env production',
+    '<%= config.bin %> nitrogen env pull --force',
   ];
 
   static override flags = {
-    path: Flags.string({ description: 'Path to the Nitro storefront root', default: '.' }),
+    path: Flags.string({ description: 'Path to the Nitrogen storefront root', default: '.' }),
     env: Flags.string({ description: 'Environment to pull (production, preview, all)', default: 'all' }),
     'env-file': Flags.string({ description: 'Output .env file path', default: '.env' }),
     force: Flags.boolean({ description: 'Overwrite existing .env file', default: false }),
   };
 
   async run(): Promise<void> {
-    const { flags } = await this.parse(NitroEnvPull);
+    const { flags } = await this.parse(NitrogenEnvPull);
     const root = resolveProjectRoot(flags.path);
 
     printBanner();
 
     const config = readProjectConfig(root);
     if (!config.store || !config.storefrontId) {
-      logger.error('No store linked. Run `cloudcart nitro link` first.');
+      logger.error('No store linked. Run `cloudcart nitrogen link` first.');
       this.exit(1);
     }
 
@@ -84,10 +84,10 @@ export default class NitroEnvPull extends Command {
     const gql = createGraphQLClient(session);
 
     const result = await gql.query<StorefrontEnvResponse>(STOREFRONT_ENV_QUERY, { id: storefrontId });
-    const storefront = result.data?.nitroStorefront;
+    const storefront = result.data?.nitrogenStorefront;
 
     if (!storefront) {
-      logger.error(`Storefront not found. It may have been deleted. Run \`cloudcart nitro link\` again.`);
+      logger.error(`Storefront not found. It may have been deleted. Run \`cloudcart nitrogen link\` again.`);
       this.exit(1);
     }
 
@@ -102,7 +102,7 @@ export default class NitroEnvPull extends Command {
 
     // Build .env content
     const lines: string[] = [
-      `# CloudCart Nitro — Environment Variables`,
+      `# CloudCart Nitrogen — Environment Variables`,
       `# Store: ${storeName}`,
       `# Storefront: ${storefront.name}`,
       `# Environment: ${targetEnv}`,

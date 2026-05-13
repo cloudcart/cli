@@ -2,26 +2,26 @@ import { Command, Flags } from '@oclif/core';
 import { logger, colors, printBanner } from '@cloudcart/cli-kit';
 import { resolveProjectRoot, readProjectConfig } from '../../../lib/project.js';
 
-export default class NitroEnvList extends Command {
+export default class NitrogenEnvList extends Command {
   static override description = 'List environments on a linked CloudCart store';
 
   static override examples = [
-    '<%= config.bin %> nitro env list',
+    '<%= config.bin %> nitrogen env list',
   ];
 
   static override flags = {
-    path: Flags.string({ description: 'Path to the Nitro storefront root', default: '.' }),
+    path: Flags.string({ description: 'Path to the Nitrogen storefront root', default: '.' }),
   };
 
   async run(): Promise<void> {
-    const { flags } = await this.parse(NitroEnvList);
+    const { flags } = await this.parse(NitrogenEnvList);
     const root = resolveProjectRoot(flags.path);
 
     printBanner();
 
     const config = readProjectConfig(root);
     if (!config.store) {
-      logger.error('No store linked. Run `cloudcart nitro link` first.');
+      logger.error('No store linked. Run `cloudcart nitrogen link` first.');
       this.exit(1);
     }
 

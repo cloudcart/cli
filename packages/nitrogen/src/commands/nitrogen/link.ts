@@ -2,7 +2,7 @@ import { Command, Flags } from '@oclif/core';
 import { logger, colors, printBanner, promptInput, getSession, createGraphQLClient, type GraphQLClient } from '@cloudcart/cli-kit';
 import { resolveProjectRoot, readProjectConfig, writeProjectConfig } from '../../lib/project.js';
 
-interface NitroStorefrontGql {
+interface NitrogenStorefrontGql {
   id: string;
   name: string;
   handle: string;
@@ -15,18 +15,18 @@ interface NitroStorefrontGql {
 }
 
 interface FindStorefrontResponse {
-  nitroStorefrontByName: NitroStorefrontGql | null;
+  nitrogenStorefrontByName: NitrogenStorefrontGql | null;
 }
 
 interface ListStorefrontsResponse {
-  nitroStorefronts: {
-    edges: Array<{ node: Pick<NitroStorefrontGql, 'id' | 'name' | 'handle' | 'novaHostname'> }>;
+  nitrogenStorefronts: {
+    edges: Array<{ node: Pick<NitrogenStorefrontGql, 'id' | 'name' | 'handle' | 'novaHostname'> }>;
   };
 }
 
 const FIND_STOREFRONT_QUERY = `
   query FindStorefront($name: String!) {
-    nitroStorefrontByName(name: $name) {
+    nitrogenStorefrontByName(name: $name) {
       id
       name
       handle
@@ -42,7 +42,7 @@ const FIND_STOREFRONT_QUERY = `
 
 const LIST_STOREFRONTS_QUERY = `
   query ListStorefronts {
-    nitroStorefronts(first: 50) {
+    nitrogenStorefronts(first: 50) {
       edges {
         node {
           id
@@ -55,23 +55,23 @@ const LIST_STOREFRONTS_QUERY = `
   }
 `;
 
-export default class NitroLink extends Command {
-  static override description = 'Link a Nitro project to a CloudCart store';
+export default class NitrogenLink extends Command {
+  static override description = 'Link a Nitrogen project to a CloudCart store';
 
   static override examples = [
-    '<%= config.bin %> nitro link --storefront "My Store"',
-    '<%= config.bin %> nitro link --store mystore.cloudcart.com --storefront "My Store"',
+    '<%= config.bin %> nitrogen link --storefront "My Store"',
+    '<%= config.bin %> nitrogen link --store mystore.cloudcart.com --storefront "My Store"',
   ];
 
   static override flags = {
     store: Flags.string({ char: 's', description: 'Store URL (e.g., mystore.cloudcart.com)' }),
     storefront: Flags.string({ description: 'Storefront name to link to' }),
     force: Flags.boolean({ description: 'Overwrite existing link', default: false }),
-    path: Flags.string({ description: 'Path to the Nitro storefront root', default: '.' }),
+    path: Flags.string({ description: 'Path to the Nitrogen storefront root', default: '.' }),
   };
 
   async run(): Promise<void> {
-    const { flags } = await this.parse(NitroLink);
+    const { flags } = await this.parse(NitrogenLink);
     const root = resolveProjectRoot(flags.path);
 
     printBanner();
@@ -103,11 +103,11 @@ export default class NitroLink extends Command {
 
     const result = await gql.query<FindStorefrontResponse>(FIND_STOREFRONT_QUERY, { name: storefrontName });
 
-    if (!result.data?.nitroStorefrontByName) {
+    if (!result.data?.nitrogenStorefrontByName) {
       logger.error(`Storefront "${storefrontName}" not found on ${session.storeUrl}.`);
       logger.info('Available storefronts:');
       const listResult = await gql.query<ListStorefrontsResponse>(LIST_STOREFRONTS_QUERY);
-      const storefronts = listResult.data?.nitroStorefronts?.edges ?? [];
+      const storefronts = listResult.data?.nitrogenStorefronts?.edges ?? [];
       if (storefronts.length === 0) {
         logger.info('  (none — create one in the admin panel first)');
       } else {
@@ -118,7 +118,7 @@ export default class NitroLink extends Command {
       this.exit(1);
     }
 
-    const sf = result.data.nitroStorefrontByName;
+    const sf = result.data.nitrogenStorefrontByName;
 
     // Save config
     const newConfig = {
@@ -149,13 +149,13 @@ export default class NitroLink extends Command {
     }
     console.log(`  ${colors.dim('Config:')}        .cloudcart/project.json`);
     console.log();
-    logger.info('Next: run `cloudcart nitro env pull` to fetch environment variables.');
+    logger.info('Next: run `cloudcart nitrogen env pull` to fetch environment variables.');
   }
 
   private async promptStorefront(gql: GraphQLClient): Promise<string> {
     // List available storefronts for the user to pick
     const listResult = await gql.query<ListStorefrontsResponse>(LIST_STOREFRONTS_QUERY);
-    const storefronts = listResult.data?.nitroStorefronts?.edges ?? [];
+    const storefronts = listResult.data?.nitrogenStorefronts?.edges ?? [];
 
     if (storefronts.length > 0) {
       console.log();

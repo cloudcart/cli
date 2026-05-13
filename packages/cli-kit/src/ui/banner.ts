@@ -16,15 +16,15 @@ export function printBanner(): void {
 }
 
 /**
- * Prints a Nitro-specific banner for storefront commands.
+ * Prints a Nitrogen-specific banner for storefront commands.
  */
-export function printNitroBanner(): void {
+export function printNitrogenBanner(): void {
   console.log();
   printGradientBar();
   console.log();
   console.log(
     chalk.hex('#6366F1').bold('  ☁  CloudCart') +
-    chalk.white.bold(' Nitro') +
+    chalk.white.bold(' Nitrogen') +
     chalk.dim(' — Headless Commerce Framework')
   );
   console.log();

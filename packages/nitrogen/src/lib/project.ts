@@ -1,24 +1,24 @@
 /**
- * Shared utilities for Nitro plugin commands.
+ * Shared utilities for Nitrogen plugin commands.
  */
 
 import { spawn } from 'node:child_process';
 import { resolve } from 'node:path';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 
-/** Resolve and validate a Nitro project root. */
+/** Resolve and validate a Nitrogen project root. */
 export function resolveProjectRoot(path: string): string {
   const root = resolve(path);
   return root;
 }
 
-/** Validate that a directory is a Nitro project. */
+/** Validate that a directory is a Nitrogen project. */
 export function validateProject(root: string): void {
   if (!existsSync(resolve(root, 'package.json'))) {
-    throw new Error(`No package.json found in ${root}. Is this a Nitro project?`);
+    throw new Error(`No package.json found in ${root}. Is this a Nitrogen project?`);
   }
   if (!existsSync(resolve(root, 'app/routes'))) {
-    throw new Error(`No app/routes/ directory found in ${root}. Is this a Nitro project?`);
+    throw new Error(`No app/routes/ directory found in ${root}. Is this a Nitrogen project?`);
   }
 }
 

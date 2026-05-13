@@ -18,12 +18,12 @@ const ROUTE_TEMPLATES: Record<string, { file: string; description: string }> = {
   '[sitemap.xml]': { file: '[sitemap.xml].tsx', description: 'Sitemap generation' },
 };
 
-export default class NitroGenerateRoute extends Command {
-  static override description = 'Generate a Nitro route from template';
+export default class NitrogenGenerateRoute extends Command {
+  static override description = 'Generate a Nitrogen route from template';
 
   static override examples = [
-    '<%= config.bin %> nitro generate route products.$handle',
-    '<%= config.bin %> nitro generate route cart',
+    '<%= config.bin %> nitrogen generate route products.$handle',
+    '<%= config.bin %> nitrogen generate route cart',
   ];
 
   static override args = {
@@ -32,11 +32,11 @@ export default class NitroGenerateRoute extends Command {
 
   static override flags = {
     force: Flags.boolean({ description: 'Overwrite existing route', default: false }),
-    path: Flags.string({ description: 'Path to the Nitro storefront root', default: '.' }),
+    path: Flags.string({ description: 'Path to the Nitrogen storefront root', default: '.' }),
   };
 
   async run(): Promise<void> {
-    const { args, flags } = await this.parse(NitroGenerateRoute);
+    const { args, flags } = await this.parse(NitrogenGenerateRoute);
     const root = resolveProjectRoot(flags.path);
 
     printBanner();
@@ -69,9 +69,9 @@ function generateRouteContent(routeName: string): string {
   return `import {useLoaderData} from 'react-router';
 import type {Route} from './+types/${ROUTE_TEMPLATES[routeName]?.file.replace('.tsx', '') ?? routeName}';
 import {getContext} from '~/lib/context';
-import {getSeoMeta} from '@cloudcart/nitro';
+import {getSeoMeta} from '@cloudcart/nitrogen';
 
-export const meta: Route.MetaFunction = () => getSeoMeta({title: '${capitalized} | Nitro'});
+export const meta: Route.MetaFunction = () => getSeoMeta({title: '${capitalized} | Nitrogen'});
 
 export async function loader({context, request}: Route.LoaderArgs) {
   const ctx = await getContext(context, request);

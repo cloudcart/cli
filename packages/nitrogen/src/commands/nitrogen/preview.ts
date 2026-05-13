@@ -3,24 +3,24 @@ import { resolve } from 'node:path';
 import { logger, colors, printBanner } from '@cloudcart/cli-kit';
 import { resolveProjectRoot, validateProject, loadEnvFile, exec } from '../../lib/project.js';
 
-export default class NitroPreview extends Command {
-  static override description = 'Preview a Nitro storefront production build locally';
+export default class NitrogenPreview extends Command {
+  static override description = 'Preview a Nitrogen storefront production build locally';
 
   static override examples = [
-    '<%= config.bin %> nitro preview',
-    '<%= config.bin %> nitro preview --build',
-    '<%= config.bin %> nitro preview --port 4000',
+    '<%= config.bin %> nitrogen preview',
+    '<%= config.bin %> nitrogen preview --build',
+    '<%= config.bin %> nitrogen preview --port 4000',
   ];
 
   static override flags = {
     port: Flags.integer({ char: 'p', description: 'Port to run the preview server on', default: 3000 }),
-    path: Flags.string({ description: 'Path to the Nitro storefront root', default: '.' }),
+    path: Flags.string({ description: 'Path to the Nitrogen storefront root', default: '.' }),
     build: Flags.boolean({ description: 'Run a production build before previewing', default: false }),
     'env-file': Flags.string({ description: 'Path to .env file', default: '.env' }),
   };
 
   async run(): Promise<void> {
-    const { flags } = await this.parse(NitroPreview);
+    const { flags } = await this.parse(NitrogenPreview);
     const root = resolveProjectRoot(flags.path);
     validateProject(root);
 

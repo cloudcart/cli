@@ -1,15 +1,15 @@
 import { Command, Flags, Args } from '@oclif/core';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { logger, colors, printNitroBanner, promptInput, promptSelect, printGradientBar, printInfoBox, printStep } from '@cloudcart/cli-kit';
+import { logger, colors, printNitrogenBanner, promptInput, promptSelect, printGradientBar, printInfoBox, printStep } from '@cloudcart/cli-kit';
 import { exec } from '../../lib/project.js';
 
-export default class NitroInit extends Command {
-  static override description = 'Create a new Nitro storefront project';
+export default class NitrogenInit extends Command {
+  static override description = 'Create a new Nitrogen storefront project';
 
   static override examples = [
-    '<%= config.bin %> nitro init my-store',
-    '<%= config.bin %> nitro init my-store --quickstart',
+    '<%= config.bin %> nitrogen init my-store',
+    '<%= config.bin %> nitrogen init my-store --quickstart',
   ];
 
   static override args = {
@@ -34,9 +34,9 @@ export default class NitroInit extends Command {
   };
 
   async run(): Promise<void> {
-    const { args, flags } = await this.parse(NitroInit);
+    const { args, flags } = await this.parse(NitrogenInit);
 
-    printNitroBanner();
+    printNitrogenBanner();
 
     // ── Interactive prompts (skipped with --quickstart) ──
 
@@ -47,7 +47,7 @@ export default class NitroInit extends Command {
     if (!projectName && !isQuickstart) {
       projectName = await promptInput('Project name:');
     }
-    projectName = projectName?.trim() || 'my-nitro-store';
+    projectName = projectName?.trim() || 'my-nitrogen-store';
     const projectPath = resolve(projectName);
 
     if (existsSync(projectPath)) {
@@ -149,12 +149,12 @@ export default class NitroInit extends Command {
 
     printInfoBox('Next steps', [
       colors.bold(`cd ${projectName}`),
-      colors.bold('cloudcart nitro dev'),
+      colors.bold('cloudcart nitrogen dev'),
       ...(storeDomain ? [] : [
         '',
         colors.dim('To connect to a real CloudCart store:'),
-        colors.bold('cloudcart nitro link'),
-        colors.bold('cloudcart nitro env pull'),
+        colors.bold('cloudcart nitrogen link'),
+        colors.bold('cloudcart nitrogen env pull'),
       ]),
     ]);
     console.log();
@@ -183,8 +183,8 @@ export default class NitroInit extends Command {
         typecheck: 'react-router typegen && tsc --noEmit',
       },
       dependencies: {
-        '@cloudcart/nitro': '^0.1.0',
-        '@cloudcart/nitro-react': '^0.1.0',
+        '@cloudcart/nitrogen': '^0.1.0',
+        '@cloudcart/nitrogen-react': '^0.1.0',
         isbot: '^5.1.22',
         react: '^19.1.0',
         'react-dom': '^19.1.0',
@@ -281,7 +281,7 @@ export default class NitroInit extends Command {
 // ── Template strings ──────────────────────────────────────────────────
 
 function dotEnv(storeDomain: string) {
-  return `SESSION_SECRET=nitro-dev-secret-change-me
+  return `SESSION_SECRET=nitrogen-dev-secret-change-me
 PUBLIC_STORE_DOMAIN=${storeDomain || 'localhost'}
 # Leave empty for mock data, fill to connect to real store:
 PUBLIC_STOREFRONT_API_TOKEN=
@@ -300,9 +300,9 @@ declare module "react-router" {
       PUBLIC_STOREFRONT_API_TOKEN?: string;
       PRIVATE_STOREFRONT_API_TOKEN?: string;
     };
-    storefront: import("@cloudcart/nitro").StorefrontClient;
-    cart: import("@cloudcart/nitro").CartHandler;
-    session: import("@cloudcart/nitro").AppSession;
+    storefront: import("@cloudcart/nitrogen").StorefrontClient;
+    cart: import("@cloudcart/nitrogen").CartHandler;
+    session: import("@cloudcart/nitrogen").AppSession;
   }
 }
 `;
@@ -314,7 +314,7 @@ import tsconfigPaths from 'vite-tsconfig-paths';
 export default defineConfig({
   plugins: [
     {
-      name: 'nitro-worker-entry',
+      name: 'nitrogen-worker-entry',
       config(_, env) {
         return {
           ...(env.isSsrBuild && {
@@ -354,7 +354,7 @@ build
 `;
 
 const SERVER_TS = `import {createRequestHandler} from 'react-router';
-import {createNitroContext} from '@cloudcart/nitro';
+import {createNitrogenContext} from '@cloudcart/nitrogen';
 
 const handler = createRequestHandler(
   // @ts-expect-error — virtual module
@@ -365,10 +365,10 @@ const handler = createRequestHandler(
 export default {
   async fetch(request, env) {
     try {
-      const context = await createNitroContext({
+      const context = await createNitrogenContext({
         request,
         env: {
-          SESSION_SECRET: env.SESSION_SECRET ?? 'nitro-dev-secret',
+          SESSION_SECRET: env.SESSION_SECRET ?? 'nitrogen-dev-secret',
           PUBLIC_STORE_DOMAIN: env.PUBLIC_STORE_DOMAIN,
           PUBLIC_STOREFRONT_API_TOKEN: env.PUBLIC_STOREFRONT_API_TOKEN,
           PRIVATE_STOREFRONT_API_TOKEN: env.PRIVATE_STOREFRONT_API_TOKEN,
@@ -396,8 +396,8 @@ import {flatRoutes} from '@react-router/fs-routes';
 export default flatRoutes() satisfies RouteConfig;
 `;
 
-const CONTEXT_TS = `export type {NitroContext} from '@cloudcart/nitro';
-export {getContext, createNitroContext} from '@cloudcart/nitro';
+const CONTEXT_TS = `export type {NitrogenContext} from '@cloudcart/nitrogen';
+export {getContext, createNitrogenContext} from '@cloudcart/nitrogen';
 `;
 
 const ENTRY_CLIENT = `import {HydratedRouter} from 'react-router/dom';
@@ -430,9 +430,9 @@ export default async function handleRequest(
 const ROOT_TSX = `import {Links, Meta, Outlet, Scripts, ScrollRestoration, useRouteLoaderData, useRouteError, isRouteErrorResponse, type MetaFunction} from 'react-router';
 import type {Route} from './+types/root';
 import {getContext} from '~/lib/context';
-import {getSeoMeta} from '@cloudcart/nitro';
+import {getSeoMeta} from '@cloudcart/nitrogen';
 
-export const meta: MetaFunction = () => getSeoMeta({title: 'Nitro | Modern Commerce'});
+export const meta: MetaFunction = () => getSeoMeta({title: 'Nitrogen | Modern Commerce'});
 
 export const shouldRevalidate: Route.ShouldRevalidateFunction = ({formMethod, currentUrl, nextUrl}) => {
   if (formMethod && formMethod !== 'GET') return true;
@@ -475,10 +475,10 @@ export function ErrorBoundary() {
 const ROUTE_INDEX = `import {useLoaderData, Link} from 'react-router';
 import type {Route} from './+types/_index';
 import {getContext} from '~/lib/context';
-import {getSeoMeta} from '@cloudcart/nitro';
-import {Money, Image} from '@cloudcart/nitro-react';
+import {getSeoMeta} from '@cloudcart/nitrogen';
+import {Money, Image} from '@cloudcart/nitrogen-react';
 
-export const meta: Route.MetaFunction = () => getSeoMeta({title: 'Nitro | Home'});
+export const meta: Route.MetaFunction = () => getSeoMeta({title: 'Nitrogen | Home'});
 
 export async function loader({context, request}: Route.LoaderArgs) {
   const ctx = await getContext(context, request);
@@ -490,7 +490,7 @@ export default function Homepage() {
   const {products} = useLoaderData<typeof loader>();
   return (
     <div>
-      <h1>Welcome to Nitro</h1>
+      <h1>Welcome to Nitrogen</h1>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(250px,1fr))',gap:'1.5rem',marginTop:'1rem'}}>
         {products.map((p) => (
           <Link key={p.id} to={\`/products/\${p.handle}\`} style={{textDecoration:'none',color:'inherit'}}>
@@ -508,10 +508,10 @@ export default function Homepage() {
 const ROUTE_PRODUCTS_INDEX = `import {useLoaderData, Link} from 'react-router';
 import type {Route} from './+types/products._index';
 import {getContext} from '~/lib/context';
-import {getSeoMeta} from '@cloudcart/nitro';
-import {Money, Image} from '@cloudcart/nitro-react';
+import {getSeoMeta} from '@cloudcart/nitrogen';
+import {Money, Image} from '@cloudcart/nitrogen-react';
 
-export const meta: Route.MetaFunction = () => getSeoMeta({title: 'Nitro | Products'});
+export const meta: Route.MetaFunction = () => getSeoMeta({title: 'Nitrogen | Products'});
 
 export async function loader({context, request}: Route.LoaderArgs) {
   const ctx = await getContext(context, request);
@@ -541,10 +541,10 @@ export default function ProductsIndex() {
 const ROUTE_PRODUCT = `import {useLoaderData, data, Link} from 'react-router';
 import type {Route} from './+types/products.$handle';
 import {getContext} from '~/lib/context';
-import {getSeoMeta} from '@cloudcart/nitro';
-import {Image, ProductPrice, AddToCartButton, RichText, VariantSelector, useOptimisticVariant} from '@cloudcart/nitro-react';
+import {getSeoMeta} from '@cloudcart/nitrogen';
+import {Image, ProductPrice, AddToCartButton, RichText, VariantSelector, useOptimisticVariant} from '@cloudcart/nitrogen-react';
 
-export const meta: Route.MetaFunction = ({data: d}) => getSeoMeta({title: d?.product ? d.product.title + ' | Nitro' : 'Product | Nitro', description: d?.product?.description});
+export const meta: Route.MetaFunction = ({data: d}) => getSeoMeta({title: d?.product ? d.product.title + ' | Nitrogen' : 'Product | Nitrogen', description: d?.product?.description});
 
 export async function loader({params, context, request}: Route.LoaderArgs) {
   const ctx = await getContext(context, request);
@@ -591,10 +591,10 @@ export default function ProductPage() {
 const ROUTE_COLLECTIONS_INDEX = `import {useLoaderData, Link} from 'react-router';
 import type {Route} from './+types/collections._index';
 import {getContext} from '~/lib/context';
-import {getSeoMeta} from '@cloudcart/nitro';
-import {Image} from '@cloudcart/nitro-react';
+import {getSeoMeta} from '@cloudcart/nitrogen';
+import {Image} from '@cloudcart/nitrogen-react';
 
-export const meta: Route.MetaFunction = () => getSeoMeta({title: 'Nitro | Collections'});
+export const meta: Route.MetaFunction = () => getSeoMeta({title: 'Nitrogen | Collections'});
 
 export async function loader({context, request}: Route.LoaderArgs) {
   const ctx = await getContext(context, request);
@@ -623,10 +623,10 @@ export default function CollectionsIndex() {
 const ROUTE_COLLECTION = `import {useLoaderData, data, Link} from 'react-router';
 import type {Route} from './+types/collections.$handle';
 import {getContext} from '~/lib/context';
-import {getSeoMeta} from '@cloudcart/nitro';
-import {Money, Image} from '@cloudcart/nitro-react';
+import {getSeoMeta} from '@cloudcart/nitrogen';
+import {Money, Image} from '@cloudcart/nitrogen-react';
 
-export const meta: Route.MetaFunction = ({data: d}) => getSeoMeta({title: d?.collection ? d.collection.title + ' | Nitro' : 'Collection | Nitro'});
+export const meta: Route.MetaFunction = ({data: d}) => getSeoMeta({title: d?.collection ? d.collection.title + ' | Nitrogen' : 'Collection | Nitrogen'});
 
 export async function loader({params, context, request}: Route.LoaderArgs) {
   const ctx = await getContext(context, request);
@@ -658,10 +658,10 @@ export default function CollectionPage() {
 const ROUTE_CART = `import {useLoaderData, redirect} from 'react-router';
 import type {Route} from './+types/cart';
 import {getContext} from '~/lib/context';
-import type {CartData} from '@cloudcart/nitro';
-import {Money, Image, CartForm, useOptimisticCart} from '@cloudcart/nitro-react';
+import type {CartData} from '@cloudcart/nitrogen';
+import {Money, Image, CartForm, useOptimisticCart} from '@cloudcart/nitrogen-react';
 
-export const meta: Route.MetaFunction = () => [{title: 'Nitro | Cart'}];
+export const meta: Route.MetaFunction = () => [{title: 'Nitrogen | Cart'}];
 
 export async function loader({context, request}: Route.LoaderArgs) {
   const ctx = await getContext(context, request);
@@ -717,10 +717,10 @@ export default function CartPage() {
 const ROUTE_SEARCH = `import {useLoaderData, Form, Link} from 'react-router';
 import type {Route} from './+types/search';
 import {getContext} from '~/lib/context';
-import {getSeoMeta} from '@cloudcart/nitro';
-import {Money, Image} from '@cloudcart/nitro-react';
+import {getSeoMeta} from '@cloudcart/nitrogen';
+import {Money, Image} from '@cloudcart/nitrogen-react';
 
-export const meta: Route.MetaFunction = () => getSeoMeta({title: 'Nitro | Search'});
+export const meta: Route.MetaFunction = () => getSeoMeta({title: 'Nitrogen | Search'});
 
 export async function loader({request, context}: Route.LoaderArgs) {
   const ctx = await getContext(context, request);
@@ -756,10 +756,10 @@ export default function SearchPage() {
 const ROUTE_PAGE = `import {useLoaderData, data} from 'react-router';
 import type {Route} from './+types/pages.$handle';
 import {getContext} from '~/lib/context';
-import {getSeoMeta} from '@cloudcart/nitro';
-import {RichText} from '@cloudcart/nitro-react';
+import {getSeoMeta} from '@cloudcart/nitrogen';
+import {RichText} from '@cloudcart/nitrogen-react';
 
-export const meta: Route.MetaFunction = ({data: d}) => getSeoMeta({title: d?.page ? d.page.title + ' | Nitro' : 'Page | Nitro'});
+export const meta: Route.MetaFunction = ({data: d}) => getSeoMeta({title: d?.page ? d.page.title + ' | Nitrogen' : 'Page | Nitrogen'});
 
 export async function loader({params, context, request}: Route.LoaderArgs) {
   const ctx = await getContext(context, request);
@@ -777,9 +777,9 @@ export default function PageRoute() {
 const ROUTE_BLOGS_INDEX = `import {useLoaderData, Link} from 'react-router';
 import type {Route} from './+types/blogs._index';
 import {getContext} from '~/lib/context';
-import {getSeoMeta} from '@cloudcart/nitro';
+import {getSeoMeta} from '@cloudcart/nitrogen';
 
-export const meta: Route.MetaFunction = () => getSeoMeta({title: 'Nitro | Blog'});
+export const meta: Route.MetaFunction = () => getSeoMeta({title: 'Nitrogen | Blog'});
 
 export async function loader({context, request}: Route.LoaderArgs) {
   const ctx = await getContext(context, request);
@@ -796,10 +796,10 @@ export default function BlogsIndex() {
 const ROUTE_BLOG = `import {useLoaderData, Link, data} from 'react-router';
 import type {Route} from './+types/blogs.$blogHandle._index';
 import {getContext} from '~/lib/context';
-import {getSeoMeta} from '@cloudcart/nitro';
-import {Image} from '@cloudcart/nitro-react';
+import {getSeoMeta} from '@cloudcart/nitrogen';
+import {Image} from '@cloudcart/nitrogen-react';
 
-export const meta: Route.MetaFunction = ({data: d}) => getSeoMeta({title: d?.blog ? d.blog.title + ' | Nitro' : 'Blog | Nitro'});
+export const meta: Route.MetaFunction = ({data: d}) => getSeoMeta({title: d?.blog ? d.blog.title + ' | Nitrogen' : 'Blog | Nitrogen'});
 
 export async function loader({params, context, request}: Route.LoaderArgs) {
   const ctx = await getContext(context, request);
@@ -829,10 +829,10 @@ export default function BlogPage() {
 const ROUTE_ARTICLE = `import {useLoaderData, data} from 'react-router';
 import type {Route} from './+types/blogs.$blogHandle.$articleHandle';
 import {getContext} from '~/lib/context';
-import {getSeoMeta} from '@cloudcart/nitro';
-import {Image, RichText} from '@cloudcart/nitro-react';
+import {getSeoMeta} from '@cloudcart/nitrogen';
+import {Image, RichText} from '@cloudcart/nitrogen-react';
 
-export const meta: Route.MetaFunction = ({data: d}) => getSeoMeta({title: d?.article ? d.article.title + ' | Nitro' : 'Article | Nitro'});
+export const meta: Route.MetaFunction = ({data: d}) => getSeoMeta({title: d?.article ? d.article.title + ' | Nitrogen' : 'Article | Nitrogen'});
 
 export async function loader({params, context, request}: Route.LoaderArgs) {
   const ctx = await getContext(context, request);
@@ -857,9 +857,9 @@ export default function ArticlePage() {
 const ROUTE_POLICIES_INDEX = `import {useLoaderData, Link} from 'react-router';
 import type {Route} from './+types/policies._index';
 import {getContext} from '~/lib/context';
-import {getSeoMeta} from '@cloudcart/nitro';
+import {getSeoMeta} from '@cloudcart/nitrogen';
 
-export const meta: Route.MetaFunction = () => getSeoMeta({title: 'Nitro | Policies'});
+export const meta: Route.MetaFunction = () => getSeoMeta({title: 'Nitrogen | Policies'});
 
 export async function loader({context, request}: Route.LoaderArgs) {
   const ctx = await getContext(context, request);
@@ -876,10 +876,10 @@ export default function PoliciesIndex() {
 const ROUTE_POLICY = `import {useLoaderData, data} from 'react-router';
 import type {Route} from './+types/policies.$handle';
 import {getContext} from '~/lib/context';
-import {getSeoMeta} from '@cloudcart/nitro';
-import {RichText} from '@cloudcart/nitro-react';
+import {getSeoMeta} from '@cloudcart/nitrogen';
+import {RichText} from '@cloudcart/nitrogen-react';
 
-export const meta: Route.MetaFunction = ({data: d}) => getSeoMeta({title: d?.policy ? d.policy.title + ' | Nitro' : 'Policy | Nitro'});
+export const meta: Route.MetaFunction = ({data: d}) => getSeoMeta({title: d?.policy ? d.policy.title + ' | Nitrogen' : 'Policy | Nitrogen'});
 
 export async function loader({params, context, request}: Route.LoaderArgs) {
   const ctx = await getContext(context, request);
@@ -905,7 +905,7 @@ export async function loader({params, context, request}: Route.LoaderArgs) {
 }
 `;
 
-const ROUTE_ROBOTS = `import {generateRobots} from '@cloudcart/nitro';
+const ROUTE_ROBOTS = `import {generateRobots} from '@cloudcart/nitrogen';
 
 export function loader() {
   return new Response(generateRobots({
@@ -917,7 +917,7 @@ export function loader() {
 
 const ROUTE_SITEMAP = `import type {Route} from './+types/[sitemap.xml]';
 import {getContext} from '~/lib/context';
-import {generateSitemap} from '@cloudcart/nitro';
+import {generateSitemap} from '@cloudcart/nitrogen';
 
 export async function loader({context, request}: Route.LoaderArgs) {
   const ctx = await getContext(context, request);
