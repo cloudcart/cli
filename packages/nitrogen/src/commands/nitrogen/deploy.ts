@@ -1,8 +1,19 @@
 import { Command, Flags } from '@oclif/core';
-import { resolve } from 'node:path';
-import { readFileSync, existsSync } from 'node:fs';
+import { resolve, relative } from 'node:path';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { logger, colors, printNitrogenBanner, printGradientBar, printStep } from '@cloudcart/cli-kit';
 import { resolveProjectRoot, validateProject, readProjectConfig, loadEnvFile, exec } from '../../lib/project.js';
+
+interface AssetEntry {
+  /** Served path, e.g. "/assets/root-abc.js" */
+  path: string;
+  absPath: string;
+  /** SHA-256 of the contents, first 32 hex chars (Cloudflare manifest format) */
+  hash: string;
+  size: number;
+  contentType: string;
+}
 
 export default class NitrogenDeploy extends Command {
   static override description = 'Deploy a Nitrogen storefront to Nova (CloudCart Edge Hosting)';
@@ -74,8 +85,8 @@ export default class NitrogenDeploy extends Command {
       console.log();
     }
 
-    // ── Step 2: Bundle as Worker ──
-    printStep(flags['no-build'] ? 1 : 2, 'Bundling as Cloudflare Worker...');
+    // ── Step 2: Collect build output ──
+    printStep(flags['no-build'] ? 1 : 2, 'Preparing build output...');
 
     const serverBuildPath = resolve(root, 'build/server/index.js');
     if (!existsSync(serverBuildPath)) {
@@ -83,36 +94,99 @@ export default class NitrogenDeploy extends Command {
       this.exit(1);
     }
 
-    const serverBundle = readFileSync(serverBuildPath, 'utf-8');
+    const clientDir = resolve(root, 'build/client');
+    if (!existsSync(clientDir)) {
+      logger.error(`Client assets not found at ${clientDir}. Run build first.`);
+      this.exit(1);
+    }
 
-    // Create the Worker entry that wraps the React Router server build
-    const workerScript = createWorkerScript(serverBundle);
+    const assets = collectAssets(clientDir);
+    const manifest: Record<string, { hash: string; size: number }> = {};
+    for (const a of assets) manifest[a.path] = { hash: a.hash, size: a.size };
 
-    // ── Step 3: Deploy to Nova ──
-    printStep(flags['no-build'] ? 2 : 3, 'Deploying to Nova...');
-    printGradientBar();
-
-    const deployUrl = `https://${storeDomain}/admin/api/core/nitrogen/nova/deploy`;
+    const apiBase = `https://${storeDomain}/admin/api/core/nitrogen/nova`;
 
     try {
+      // ── Step 3: Open an upload session (cc-builder ↔ Cloudflare) ──
+      // cc-builder creates the assets-upload-session and returns only the files
+      // Cloudflare doesn't already have (hash dedup). The CF token stays server-side.
+      printStep(flags['no-build'] ? 2 : 3, 'Uploading static assets...');
+      printGradientBar();
+
+      const sessionResponse = await fetch(`${apiBase}/deploy/assets-session`, {
+        method: 'POST',
+        headers: {
+          'X-Nova-Deploy-Token': deployToken,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ manifest, environment }),
+      });
+
+      const sessionResult = await sessionResponse.json() as {
+        data?: { account_id?: string; upload_jwt?: string; buckets?: string[][] };
+        message?: string;
+        error?: string;
+      };
+
+      if (!sessionResponse.ok || !sessionResult.data?.upload_jwt) {
+        logger.error(`Upload session failed: ${sessionResult.message ?? sessionResult.error ?? sessionResponse.statusText}`);
+        this.exit(1);
+      }
+
+      const { account_id: accountId, upload_jwt: uploadJwt, buckets = [] } = sessionResult.data;
+      const missingCount = buckets.reduce((n, b) => n + b.length, 0);
+      logger.info(`${missingCount} of ${assets.length} asset(s) need uploading (rest deduplicated)`);
+
+      // Upload the missing files DIRECTLY to Cloudflare (bytes never pass through
+      // cc-builder, so this scales to any build size), one bucket per request,
+      // using the short-lived upload JWT. The final response returns the
+      // completion JWT we attach to the worker at deploy time.
+      const byHash = new Map(assets.map((a) => [a.hash, a]));
+      let assetsJwt = uploadJwt;
+      for (const bucket of buckets) {
+        const cfForm = new FormData();
+        for (const hash of bucket) {
+          const a = byHash.get(hash);
+          if (!a) continue;
+          const b64 = readFileSync(a.absPath).toString('base64');
+          cfForm.append(hash, new Blob([b64], { type: a.contentType }), hash);
+        }
+        const uploadResponse = await fetch(
+          `https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/assets/upload?base64=true`,
+          { method: 'POST', headers: { Authorization: `Bearer ${uploadJwt}` }, body: cfForm },
+        );
+        const uploadResult = await uploadResponse.json() as {
+          result?: { jwt?: string };
+          errors?: { message?: string }[];
+        };
+        if (!uploadResponse.ok) {
+          logger.error(`Asset upload failed: ${uploadResult.errors?.[0]?.message ?? uploadResponse.statusText}`);
+          this.exit(1);
+        }
+        if (uploadResult.result?.jwt) {
+          assetsJwt = uploadResult.result.jwt;
+        }
+      }
+
+      // ── Step 4: Deploy worker (assets already uploaded to Cloudflare) ──
+      printStep(flags['no-build'] ? 3 : 4, 'Deploying to Nova...');
+
       const formData = new FormData();
-      formData.append('worker', new Blob([workerScript], { type: 'application/javascript' }), 'worker.js');
+      formData.append('worker', new Blob([readFileSync(serverBuildPath)], { type: 'application/javascript+module' }), 'index.js');
       formData.append('environment', environment);
+      formData.append('assets_jwt', assetsJwt);
 
       // Add git metadata if available
       try {
         const { execSync } = await import('node:child_process');
-        const commitSha = execSync('git rev-parse --short HEAD', { cwd: root, encoding: 'utf-8' }).trim();
-        const commitMsg = execSync('git log -1 --pretty=%s', { cwd: root, encoding: 'utf-8' }).trim();
-        const branch = execSync('git branch --show-current', { cwd: root, encoding: 'utf-8' }).trim();
-        formData.append('commit_sha', commitSha);
-        formData.append('commit_message', commitMsg);
-        formData.append('branch', branch);
+        formData.append('commit_sha', execSync('git rev-parse --short HEAD', { cwd: root, encoding: 'utf-8' }).trim());
+        formData.append('commit_message', execSync('git log -1 --pretty=%s', { cwd: root, encoding: 'utf-8' }).trim());
+        formData.append('branch', execSync('git branch --show-current', { cwd: root, encoding: 'utf-8' }).trim());
       } catch {
         // Not a git repo, skip metadata
       }
 
-      const response = await fetch(deployUrl, {
+      const response = await fetch(`${apiBase}/deploy`, {
         method: 'POST',
         headers: {
           'X-Nova-Deploy-Token': deployToken,
@@ -163,24 +237,57 @@ export default class NitrogenDeploy extends Command {
 }
 
 /**
- * Creates a Cloudflare Worker script that wraps the Nitrogen/React Router server build.
- *
- * The worker handles incoming requests by delegating to React Router's
- * request handler with environment variables from the Worker bindings.
+ * Recursively collect every file under build/client as an asset entry:
+ * served path (leading slash), SHA-256 hash (first 32 hex chars — Cloudflare
+ * manifest format), size, and Content-Type derived from the extension.
  */
-function createWorkerScript(serverBundle: string): string {
-  return `
-// ── Nitrogen Worker for Nova (CloudCart Edge Hosting) ──
-// Auto-generated by cloudcart nitrogen deploy
+function collectAssets(clientDir: string): AssetEntry[] {
+  const out: AssetEntry[] = [];
 
-${serverBundle}
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const abs = resolve(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(abs);
+        continue;
+      }
+      const contents = readFileSync(abs);
+      out.push({
+        path: '/' + relative(clientDir, abs).split(/[\\/]/).join('/'),
+        absPath: abs,
+        hash: createHash('sha256').update(contents).digest('hex').slice(0, 32),
+        size: contents.byteLength,
+        contentType: assetContentType(entry.name),
+      });
+    }
+  };
 
-// If the server build exports a default fetch handler, use it directly.
-// Otherwise, wrap it with createRequestHandler from react-router.
-if (typeof module !== 'undefined' && module.exports && typeof module.exports.fetch === 'function') {
-  addEventListener('fetch', event => {
-    event.respondWith(module.exports.fetch(event.request));
-  });
+  walk(clientDir);
+  return out;
 }
-`;
+
+function assetContentType(filename: string): string {
+  const ext = filename.slice(filename.lastIndexOf('.') + 1).toLowerCase();
+  const map: Record<string, string> = {
+    js: 'application/javascript',
+    mjs: 'application/javascript',
+    css: 'text/css',
+    html: 'text/html',
+    json: 'application/json',
+    map: 'application/json',
+    svg: 'image/svg+xml',
+    png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    webp: 'image/webp',
+    gif: 'image/gif',
+    ico: 'image/x-icon',
+    woff2: 'font/woff2',
+    woff: 'font/woff',
+    ttf: 'font/ttf',
+    otf: 'font/otf',
+    txt: 'text/plain',
+    xml: 'application/xml',
+  };
+  return map[ext] ?? 'application/octet-stream';
 }
