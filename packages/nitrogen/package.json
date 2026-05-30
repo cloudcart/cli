@@ -1,6 +1,6 @@
 {
   "name": "@cloudcart/nitrogen-plugin",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "CloudCart Nitrogen storefront commands",
   "license": "MIT",
   "type": "module",

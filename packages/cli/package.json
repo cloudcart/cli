@@ -1,6 +1,6 @@
 {
   "name": "@cloudcart/cli",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "CloudCart Developer CLI",
   "license": "MIT",
   "type": "module",
@@ -61,7 +61,7 @@
     "topicSeparator": " ",
     "warn-if-update-available": {
       "timeoutInDays": 7,
-      "message": "<%= config.name %> update available: <%= chalk.greenBright(config.version) %> \u2192 <%= chalk.greenBright(latest) %>.\nRun <%= chalk.cyan('npm i -g @cloudcart/cli@latest') %> to update."
+      "message": "<%= config.name %> update available: <%= chalk.greenBright(config.version) %> → <%= chalk.greenBright(latest) %>.\nRun <%= chalk.cyan('npm i -g @cloudcart/cli@latest') %> to update."
     }
   },
   "publishConfig": {
