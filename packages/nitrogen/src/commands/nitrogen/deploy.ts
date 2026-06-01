@@ -117,6 +117,7 @@ export default class NitrogenDeploy extends Command {
         method: 'POST',
         headers: {
           'X-Nova-Deploy-Token': deployToken,
+          'User-Agent': 'CloudCart-Nova-Deploy/1.0',
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ manifest, environment }),
@@ -190,6 +191,7 @@ export default class NitrogenDeploy extends Command {
         method: 'POST',
         headers: {
           'X-Nova-Deploy-Token': deployToken,
+          'User-Agent': 'CloudCart-Nova-Deploy/1.0',
         },
         body: formData,
       });
