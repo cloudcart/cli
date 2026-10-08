@@ -7,7 +7,6 @@ interface NitrogenStorefrontGql {
   name: string;
   handle: string;
   novaHostname: string | null;
-  publicToken: string | null;
   deploymentMethod: string | null;
   repository: string | null;
   defaultBranch: string | null;
@@ -31,7 +30,6 @@ const FIND_STOREFRONT_QUERY = `
       name
       handle
       novaHostname
-      publicToken
       deploymentMethod
       repository
       defaultBranch
@@ -121,14 +119,16 @@ export default class NitrogenLink extends Command {
     const sf = result.data.nitrogenStorefrontByName;
 
     // Save config
+    // Tokens live in .env (`env pull`), not here; drop the one an older `link` saved.
+    const rest = { ...config };
+    delete rest.publicToken;
     const newConfig = {
-      ...config,
+      ...rest,
       store: session.storeUrl,
       storefrontId: sf.id,
       storefrontName: sf.name,
       handle: sf.handle,
       novaHostname: sf.novaHostname,
-      publicToken: sf.publicToken,
       deploymentMethod: sf.deploymentMethod,
       repository: sf.repository,
       defaultBranch: sf.defaultBranch,
