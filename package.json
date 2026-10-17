@@ -11,11 +11,17 @@
     "build": "pnpm -r run build",
     "dev": "pnpm -r run dev",
     "test": "pnpm -r run test",
-    "lint": "pnpm -r run lint",
+    "lint": "node scripts/check-names.mjs && pnpm -r run lint",
     "clean": "pnpm -r run clean",
-    "typecheck": "pnpm -r run typecheck"
+    "typecheck": "pnpm -r run typecheck",
+    "check": "pnpm lint && pnpm build && pnpm typecheck && pnpm test",
+    "prepare": "simple-git-hooks"
   },
   "devDependencies": {
-    "@types/node": "^25.5.0"
+    "@types/node": "^25.5.0",
+    "simple-git-hooks": "^2.14.0"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "node scripts/require-committed-tree.mjs && pnpm check"
   }
 }

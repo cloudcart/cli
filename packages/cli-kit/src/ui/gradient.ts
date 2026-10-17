@@ -2,7 +2,6 @@ import chalk from 'chalk';
 
 /**
  * CloudCart gradient colors — a vibrant rainbow bar for terminal output.
- * Inspired by Shopify Hydrogen's colorful CLI experience.
  */
 const GRADIENT_COLORS = [
   '#FF6B6B', // red
@@ -28,7 +27,6 @@ const GRADIENT_COLORS = [
  */
 export function printGradientBar(): void {
   const width = Math.min(process.stdout.columns || 80, 120);
-  const chars = '█'.repeat(width);
   let bar = '';
 
   for (let i = 0; i < width; i++) {

@@ -25,5 +25,8 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+      # The name check and every package's lint (no warnings), then the types against the built packages.
+      - run: pnpm lint
       - run: pnpm build
+      - run: pnpm typecheck
       - run: pnpm test

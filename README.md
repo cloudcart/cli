@@ -207,6 +207,7 @@ packages/
 pnpm install
 pnpm build
 pnpm test        # every package's tests
+pnpm check       # what CI and the pre-commit hook run: the name check, lint, build, types, tests
 pnpm dev         # Watch mode
 ```
 

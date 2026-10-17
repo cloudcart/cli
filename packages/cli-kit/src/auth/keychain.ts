@@ -122,72 +122,14 @@ const linux = {
   },
 };
 
-// Windows via PowerShell + dpapi (built-in, no extra modules needed)
-const windows = {
-  async isAvailable(): Promise<boolean> {
-    return commandExists('powershell');
-  },
-
-  async set(account: string, value: string): Promise<boolean> {
-    const target = `${SERVICE}:${account}`;
-    // Use built-in cmdkey. The password is passed via arg here but cmdkey
-    // is the standard Windows approach and args are not visible to other
-    // users on modern Windows (post-Vista process isolation).
-    const result = await exec('cmdkey', [
-      `/generic:${target}`,
-      `/user:${account}`,
-      `/pass:${value}`,
-    ]);
-    return result.exitCode === 0;
-  },
-
-  async get(account: string): Promise<KeychainResult> {
-    const target = `${SERVICE}:${account}`;
-    // Use built-in PowerShell with .NET CredentialManager (no external modules)
-    const ps = [
-      `Add-Type -AssemblyName System.Runtime.InteropServices`,
-      `$target = '${target.replace(/'/g, "''")}'`,
-      // Use P/Invoke to call CredRead from advapi32.dll
-      `$sig = '[DllImport("advapi32.dll", SetLastError=true, CharSet=CharSet.Unicode)]`,
-      `public static extern bool CredRead(string target, int type, int flags, out IntPtr cred);`,
-      `[DllImport("advapi32.dll")] public static extern void CredFree(IntPtr cred);'`,
-      `$Advapi = Add-Type -MemberDefinition $sig -Namespace "CredManager" -Name "Advapi32" -PassThru`,
-      `$ptr = [IntPtr]::Zero`,
-      `if ($Advapi::CredRead($target, 1, 0, [ref]$ptr)) {`,
-      `  $cred = [System.Runtime.InteropServices.Marshal]::PtrToStructure($ptr, [Type][System.Runtime.InteropServices.ComTypes.CREDENTIAL])`,
-      // Fallback: just use cmdkey /list and parse
-      `  $Advapi::CredFree($ptr)`,
-      `}`,
-    ].join('; ');
-
-    // Simpler approach: use cmdkey /list and parse the output
-    const listResult = await exec('cmdkey', ['/list']);
-    if (listResult.exitCode !== 0) return { success: false };
-
-    // cmdkey /list output contains "Target: ..." lines
-    // We need to find our target, but cmdkey doesn't output passwords
-    // cmdkey is write-only for passwords on Windows.
-    // For reading, we need PowerShell with DPAPI or the CredentialManager module.
-    // Since neither is guaranteed built-in, fall back to file storage on Windows.
-    return { success: false };
-  },
-
-  async remove(account: string): Promise<boolean> {
-    const target = `${SERVICE}:${account}`;
-    const result = await exec('cmdkey', [`/delete:${target}`]);
-    return result.exitCode === 0;
-  },
-};
-
 type Backend = typeof macOS;
 
 function getBackend(): Backend | null {
   const os = platform();
   if (os === 'darwin') return macOS;
   if (os === 'linux') return linux;
-  // Windows: cmdkey can write but can't read passwords without extra modules.
-  // Fall back to file storage on Windows until we find a reliable built-in approach.
-  // if (os === 'win32') return windows;
+  // Windows: `cmdkey` can store a password but not read one back without extra modules, so the
+  // credentials stay in the file storage there until a reliable built-in way is found.
   return null;
 }
 
