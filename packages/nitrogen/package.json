@@ -19,9 +19,12 @@
   },
   "dependencies": {
     "@cloudcart/cli-kit": "workspace:*",
-    "@oclif/core": "^4.2.8"
+    "@oclif/core": "^4.2.8",
+    "semver": "^7.7.4",
+    "tar": "^7.5.22"
   },
   "devDependencies": {
+    "@types/semver": "^7.8.0",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "eslint": "^8.57.0",

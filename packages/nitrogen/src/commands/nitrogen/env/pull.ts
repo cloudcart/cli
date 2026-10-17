@@ -1,9 +1,9 @@
 import { Command, Flags } from '@oclif/core';
 import { resolve } from 'node:path';
 import { chmodSync, existsSync, writeFileSync } from 'node:fs';
-import { randomBytes } from 'node:crypto';
 import { logger, colors, printBanner, getSession, createGraphQLClient, promptConfirm, type GraphQLClient, type GraphQLResponse } from '@cloudcart/cli-kit';
 import { resolveProjectRoot, readProjectConfig, loadEnvFile } from '../../../lib/project.js';
+import { MIN_SESSION_SECRET_LENGTH, usableSessionSecret } from '../../../lib/session-secret.js';
 
 interface EnvVar {
   key: string;
@@ -144,9 +144,11 @@ export default class NitrogenEnvPull extends Command {
     if (!system.some((entry) => entry.key === PRIVATE_TOKEN)) system.push(privateToken);
     if (!system.some((entry) => entry.key === 'PUBLIC_STORE_DOMAIN')) system.push({ key: 'PUBLIC_STORE_DOMAIN', value: storeName });
 
+    // A project made by an older `init` holds a short secret Nitrogen refuses (B-461): it gets a new one.
+    const secret = usableSessionSecret(local[SESSION_SECRET]);
     const sessionSecret: Entry = {
       key: SESSION_SECRET,
-      value: local[SESSION_SECRET] || randomBytes(32).toString('hex'),
+      value: secret.value,
       note: 'Signs this machine\'s session cookie. The deployed storefront has its own, which never leaves CloudCart.',
     };
 
@@ -203,6 +205,9 @@ export default class NitrogenEnvPull extends Command {
     chmodSync(envFilePath, 0o600);
 
     logger.success(`${Object.keys(next).length} variables written to ${flags['env-file']}`);
+    if (secret.replaced) {
+      logger.warn(`${SESSION_SECRET} was shorter than ${MIN_SESSION_SECRET_LENGTH} characters, which Nitrogen refuses: a new one is written in its place.`);
+    }
 
     const missing = [...system, ...custom].filter((entry) => entry.value === null).map((entry) => entry.key);
     if (missing.length > 0) {

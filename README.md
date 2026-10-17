@@ -127,6 +127,32 @@ cloudcart describe
 cloudcart llms-context
 ```
 
+### Build a Nitrogen storefront
+
+```bash
+# A new project from the CloudCart starter (cloudcart/nitro-starter, its default branch)
+cloudcart nitrogen init my-store
+
+# Link it to the merchant's storefront and pull its variables into .env (mode 600)
+cd my-store
+cloudcart nitrogen link
+cloudcart nitrogen env pull
+
+cloudcart nitrogen dev
+cloudcart nitrogen build
+cloudcart nitrogen deploy
+```
+
+`init` downloads the starter, names the project after its folder, sets the Nitrogen packages to `^2.0.0`, writes `.env` from the starter's `.env.example` with a new random `SESSION_SECRET`, runs `git init` and installs the dependencies.
+
+| Flag | What it does |
+|------|--------------|
+| `--quickstart` | No questions: the mock store and npm |
+| `--package-manager npm\|pnpm\|yarn` | The package manager; pnpm and yarn make their own lockfile |
+| `--template <dir>` | A local git repository instead of the published starter (its last commit; never its `.env` or `node_modules`) |
+| `--no-git` | Skip `git init` |
+| `--no-install` | Skip the install |
+
 ## Commands
 
 | Command | Description |
@@ -139,6 +165,12 @@ cloudcart llms-context
 | `cloudcart app validate` | Validate GraphQL queries |
 | `cloudcart describe` | Machine-readable JSON self-description |
 | `cloudcart llms-context` | AI assistant context in markdown |
+| `cloudcart nitrogen init` | Create a Nitrogen storefront project from the CloudCart starter |
+| `cloudcart nitrogen link` | Link the project to a CloudCart store and its storefront |
+| `cloudcart nitrogen env pull` | Write the storefront's variables into `.env` |
+| `cloudcart nitrogen dev` | Start the development server |
+| `cloudcart nitrogen build` | Build the storefront for production |
+| `cloudcart nitrogen deploy` | Deploy the storefront to Nova (CloudCart Edge Hosting) |
 
 ## AI-First Design
 
@@ -158,6 +190,7 @@ packages/
   cli/          # @cloudcart/cli — Command definitions (oclif)
   cli-kit/      # @cloudcart/cli-kit — Auth, API client, UI, error handling
   app/          # @cloudcart/app — App commands (execute, schema, validate)
+  nitrogen/     # @cloudcart/nitrogen-plugin — Nitrogen storefront commands (init, link, env, dev, build, deploy)
   theme/        # @cloudcart/theme — Theme commands (coming soon)
 ```
 
@@ -167,7 +200,7 @@ packages/
 # Development
 pnpm install
 pnpm build
-pnpm test        # 93 tests across all packages
+pnpm test        # every package's tests
 pnpm dev         # Watch mode
 ```
 
