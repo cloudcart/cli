@@ -1,4 +1,4 @@
-import { Command, Flags } from '@oclif/core';
+import { Command, Errors, Flags } from '@oclif/core';
 import { resolve, relative } from 'node:path';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -228,6 +228,8 @@ export default class NitrogenDeploy extends Command {
         logger.info(`Status: ${result.data.status}`);
       }
     } catch (error) {
+      // A step that failed has said why and exited: only an unexpected error is reported here (B-466).
+      if (error instanceof Errors.ExitError) throw error;
       if (error instanceof Error) {
         logger.error(`Deploy failed: ${error.message}`);
       }
