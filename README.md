@@ -143,13 +143,13 @@ cloudcart nitrogen build
 cloudcart nitrogen deploy
 ```
 
-`init` downloads the starter, names the project after its folder, sets the Nitrogen packages to `^2.0.0`, writes `.env` from the starter's `.env.example` with a new random `SESSION_SECRET`, runs `git init` and installs the dependencies.
+`init` downloads the starter, names the project after its folder, sets the Nitrogen packages to `^2.0.0`, writes `.env` from the starter's `.env.example` with a new random `SESSION_SECRET`, runs `git init` and installs the dependencies. The "Mock store" choice connects the project to CloudCart's demo store (`bigrelease.com`, its public Storefront API token in `.env`), so `dev` shows a catalogue at once; `link` and `env pull` move it to your own store.
 
 `init`'s flags:
 
 | Flag | What it does |
 |------|--------------|
-| `--quickstart` | No questions: the mock store and npm |
+| `--quickstart` | No questions: the demo store and npm |
 | `--package-manager npm\|pnpm\|yarn` | The package manager; pnpm and yarn make their own lockfile |
 | `--template <dir>` | A local git repository instead of the published starter (its last commit; never its `.env` or `node_modules`) |
 | `--no-git` | Skip `git init` |

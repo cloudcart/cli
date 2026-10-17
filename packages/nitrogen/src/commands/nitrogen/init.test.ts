@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { exec } from '../../lib/project.js';
+import { DEMO_STORE } from '../../lib/demo-store.js';
+import { exec, loadEnvFile } from '../../lib/project.js';
 import NitrogenInit from './init.js';
 
 vi.mock('../../lib/project.js', async (importOriginal) => ({
@@ -49,7 +50,7 @@ function starter(): string {
   };
   writeFileSync(join(repository, 'package.json'), JSON.stringify(pkg, null, 2) + '\n');
   writeFileSync(join(repository, 'package-lock.json'), '{}\n');
-  writeFileSync(join(repository, '.env.example'), '# The domain.\nPUBLIC_STORE_DOMAIN=\nSESSION_SECRET=\n');
+  writeFileSync(join(repository, '.env.example'), '# The domain.\nPUBLIC_STORE_DOMAIN=\nPUBLIC_STOREFRONT_API_TOKEN=\nSESSION_SECRET=\n');
   mkdirSync(join(repository, 'app/routes'), { recursive: true });
   writeFileSync(join(repository, 'app/routes/product.$handle.tsx'), 'export default function Product() {}\n');
   git('add', '-A');
@@ -75,6 +76,18 @@ describe('nitrogen init', () => {
     expect(readFileSync(join(path, '.env'), 'utf-8')).toMatch(/^SESSION_SECRET=[0-9a-f]{64}$/m);
     expect(calls()).toEqual([`git init -q in ${path}`, `npm install in ${path}`]);
     expect(output.join('\n')).toContain('Created');
+  });
+
+  it("connects the project to CloudCart's demo store with --quickstart, and says how to use one's own (T-502, Q-74)", async () => {
+    const path = join(folder(), 'store');
+    await init(path, '--quickstart', '--no-git', '--no-install', '--template', starter());
+
+    const env = loadEnvFile(join(path, '.env'));
+    expect(env.PUBLIC_STORE_DOMAIN).toBe('bigrelease.com');
+    expect(env.PUBLIC_STOREFRONT_API_TOKEN).toBe(DEMO_STORE.publicToken);
+    expect(DEMO_STORE.publicToken).toMatch(/^[A-Za-z0-9]{64}$/);
+    expect(output.join('\n')).toContain('The project shows the demo store (bigrelease.com). For your own store:');
+    expect(output.join('\n')).toContain('cloudcart nitrogen link');
   });
 
   it('installs with the chosen package manager and leaves npm\'s lockfile to npm', async () => {

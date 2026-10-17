@@ -5,8 +5,9 @@ import { logger, colors, printNitrogenBanner, promptInput, promptSelect, printGr
 import { exec } from '../../lib/project.js';
 import { packageName, prepareProject, unsupportedNode, type PackageManager, type StoreConnection } from '../../lib/new-project.js';
 import { STARTER_REPOSITORY, unpackStarter, type StarterSource } from '../../lib/starter.js';
+import { DEMO_STORE } from '../../lib/demo-store.js';
 
-const MOCK_STORE = 'Mock store (demo data)';
+const MOCK_STORE = `Mock store (CloudCart's demo store, ${DEMO_STORE.domain})`;
 const CONNECT_STORE = 'Connect to a CloudCart store';
 
 export default class NitrogenInit extends Command {
@@ -24,7 +25,7 @@ export default class NitrogenInit extends Command {
 
   static override flags = {
     quickstart: Flags.boolean({
-      description: 'Use defaults (mock store, npm)',
+      description: "Use defaults (CloudCart's demo store, npm)",
       default: false,
     }),
     'package-manager': Flags.string({
@@ -62,7 +63,7 @@ export default class NitrogenInit extends Command {
 
     // Store connection
     const storeMode = isQuickstart ? MOCK_STORE : await promptSelect('Store:', [MOCK_STORE, CONNECT_STORE]);
-    let store: StoreConnection | undefined;
+    let store: StoreConnection | undefined = storeMode === MOCK_STORE ? DEMO_STORE : undefined;
     if (storeMode === CONNECT_STORE) {
       const domain = (await promptInput('Store domain (e.g., mystore.cloudcart.com):')).trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
       if (domain) store = { domain };
@@ -146,15 +147,16 @@ export default class NitrogenInit extends Command {
     printInfoBox('Next steps', [
       colors.bold(`cd ${projectName}`),
       ...(installed ? [] : [colors.bold(`${pm} install`)]),
-      // Without a public token the project reaches no store until it is linked and its variables pulled.
-      ...(!store?.publicToken
-        ? [
-            '',
-            colors.dim('Link the project to your storefront and pull its variables:'),
-            colors.bold('cloudcart nitrogen link'),
-            colors.bold('cloudcart nitrogen env pull'),
-          ]
-        : []),
+      // Without a public token the project reaches no store until it is linked and its variables pulled; the
+      // demo store's is in `.env` already, and linking moves the project to the developer's own store.
+      '',
+      colors.dim(
+        store === DEMO_STORE
+          ? `The project shows the demo store (${DEMO_STORE.domain}). For your own store:`
+          : 'Link the project to your storefront and pull its variables:',
+      ),
+      colors.bold('cloudcart nitrogen link'),
+      colors.bold('cloudcart nitrogen env pull'),
       '',
       colors.bold('cloudcart nitrogen dev'),
     ]);
