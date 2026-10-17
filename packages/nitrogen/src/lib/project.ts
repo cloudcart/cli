@@ -2,7 +2,7 @@
  * Shared utilities for Nitrogen plugin commands.
  */
 
-import { spawn } from 'node:child_process';
+import spawn from 'cross-spawn';
 import { resolve } from 'node:path';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 
@@ -62,7 +62,11 @@ export function writeProjectConfig(root: string, config: Record<string, unknown>
   writeFileSync(resolve(dir, 'project.json'), JSON.stringify(config, null, 2) + '\n');
 }
 
-/** Run a child process with inherited stdio. */
+/**
+ * Runs a program with inherited stdio, each argument passed to it as it is: no shell joins them. `cross-spawn`
+ * finds Windows' `.cmd` tools (`npm`, `npx`) and quotes for them, which Node's `spawn` does only through a shell
+ * that joins the arguments unescaped (B-463).
+ */
 export function exec(
   command: string,
   args: string[],
@@ -74,12 +78,11 @@ export function exec(
       cwd,
       stdio: 'inherit',
       env: { ...process.env, ...extraEnv },
-      shell: true,
     });
     child.on('close', (code) => {
       if (code === 0 || code === null) resolve();
       else reject(new Error(`Process exited with code ${code}`));
     });
-    child.on('error', reject);
+    child.on('error', (error) => reject(new Error(`Could not run ${command}: ${error.message}`)));
   });
 }
