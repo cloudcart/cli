@@ -2,6 +2,7 @@ import { Command, Flags } from '@oclif/core';
 import { resolve } from 'node:path';
 import { logger, printBanner } from '@cloudcart/cli-kit';
 import { resolveProjectRoot, validateProject, loadEnvFile, exec } from '../../lib/project.js';
+import { runCodegen } from '../../lib/codegen.js';
 
 export default class NitrogenBuild extends Command {
   static override description = 'Build a Nitrogen storefront for production';
@@ -13,7 +14,7 @@ export default class NitrogenBuild extends Command {
 
   static override flags = {
     path: Flags.string({ description: 'Path to the Nitrogen storefront root', default: '.' }),
-    codegen: Flags.boolean({ description: 'Generate types before building', default: false }),
+    codegen: Flags.boolean({ description: 'Generate the GraphQL query types and the route types before building', default: false }),
     sourcemap: Flags.boolean({ description: 'Generate source maps', default: false }),
     'env-file': Flags.string({ description: 'Path to .env file', default: '.env' }),
   };
@@ -27,8 +28,13 @@ export default class NitrogenBuild extends Command {
     const envVars = loadEnvFile(resolve(root, flags['env-file']));
 
     if (flags.codegen) {
-      logger.info('Generating types...');
-      await exec('npx', ['react-router', 'typegen'], root, envVars);
+      logger.info('Generating the GraphQL query types and the route types...');
+      try {
+        await runCodegen(root, envVars);
+      } catch (error) {
+        logger.error(`${(error as Error).message} Nothing was built.`);
+        this.exit(1);
+      }
     }
 
     logger.info('Building Nitrogen storefront for production...');

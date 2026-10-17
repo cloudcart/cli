@@ -2,6 +2,7 @@ import { Command, Flags } from '@oclif/core';
 import { resolve } from 'node:path';
 import { logger, colors, printBanner } from '@cloudcart/cli-kit';
 import { resolveProjectRoot, validateProject, loadEnvFile, exec } from '../../lib/project.js';
+import { runCodegen, runGraphqlCodegen, watchCodegen } from '../../lib/codegen.js';
 
 export default class NitrogenDev extends Command {
   static override description = 'Start a Nitrogen storefront dev server';
@@ -17,7 +18,10 @@ export default class NitrogenDev extends Command {
     host: Flags.boolean({ description: 'Expose dev server to the network', default: false }),
     path: Flags.string({ description: 'Path to the Nitrogen storefront root', default: '.' }),
     'env-file': Flags.string({ description: 'Path to .env file', default: '.env' }),
-    codegen: Flags.boolean({ description: 'Run type generation before starting', default: false }),
+    codegen: Flags.boolean({
+      description: 'Generate the GraphQL query types and the route types before starting, and the GraphQL types again whenever a query changes',
+      default: false,
+    }),
   };
 
   async run(): Promise<void> {
@@ -30,9 +34,18 @@ export default class NitrogenDev extends Command {
 
     logger.info(`Starting Nitrogen dev server in ${colors.bold(root)}...`);
 
+    // React Router's dev server keeps the route types current itself; the GraphQL types follow the queries here.
+    let codegenWatch: { close(): void } | undefined;
     if (flags.codegen) {
-      logger.info('Running type generation...');
-      await exec('npx', ['react-router', 'typegen'], root, envVars);
+      logger.info('Generating the GraphQL query types and the route types...');
+      try {
+        await runCodegen(root, envVars);
+      } catch (error) {
+        // The server still starts: the next change to a query runs the codegen again.
+        logger.error((error as Error).message);
+      }
+      codegenWatch = watchCodegen(root, () => runGraphqlCodegen(root, envVars), (error) => logger.error(error.message));
+      logger.info('The GraphQL query types follow your queries while the server runs.');
     }
 
     const args = ['react-router', 'dev', '--port', String(flags.port)];
@@ -41,6 +54,10 @@ export default class NitrogenDev extends Command {
     logger.info(`Dev server → ${colors.bold(`http://localhost:${flags.port}`)}`);
     console.log();
 
-    await exec('npx', args, root, { ...envVars, PORT: String(flags.port) });
+    try {
+      await exec('npx', args, root, { ...envVars, PORT: String(flags.port) });
+    } finally {
+      codegenWatch?.close();
+    }
   }
 }

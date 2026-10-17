@@ -145,6 +145,8 @@ cloudcart nitrogen deploy
 
 `init` downloads the starter, names the project after its folder, sets the Nitrogen packages to `^2.0.0`, writes `.env` from the starter's `.env.example` with a new random `SESSION_SECRET`, runs `git init` and installs the dependencies.
 
+`init`'s flags:
+
 | Flag | What it does |
 |------|--------------|
 | `--quickstart` | No questions: the mock store and npm |
@@ -152,6 +154,8 @@ cloudcart nitrogen deploy
 | `--template <dir>` | A local git repository instead of the published starter (its last commit; never its `.env` or `node_modules`) |
 | `--no-git` | Skip `git init` |
 | `--no-install` | Skip the install |
+
+`dev --codegen` and `build --codegen` also generate the types of your `#graphql` queries (the project's `codegen.ts`) and React Router's route types; under `dev` the query types are made again whenever a query changes.
 
 ## Commands
 
