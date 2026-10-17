@@ -1,39 +1,60 @@
 import { createInterface } from 'node:readline';
 
-export async function promptInput(message: string): Promise<string> {
+/**
+ * Asks one question on stderr and reads the answer from stdin. When the input ends before an answer — no terminal,
+ * or the piped answers ran out — it rejects with a message saying how to give the answer instead, rather than
+ * leaving the command waiting on nothing until Node ends it (B-462).
+ */
+function ask(question: string, onAsked?: () => () => void, label = question.trim()): Promise<string> {
+  const ended = () =>
+    new Error(
+      `No answer to "${label}": the input ended (is this a terminal?). Run the command in a terminal, or pass the answer as a flag (see --help).`,
+    );
+
+  // Without a terminal, oclif's parser reads stdin for a missing argument before the command runs, so the input
+  // can have ended already: readline would then wait for an end it will never see.
+  if (process.stdin.readableEnded) return Promise.reject(ended());
+
   const rl = createInterface({
     input: process.stdin,
     output: process.stderr,
   });
 
-  return new Promise((resolve) => {
-    rl.question(`${message} `, (answer) => {
+  return new Promise((resolve, reject) => {
+    let answered = false;
+    let restore = () => {};
+
+    rl.on('close', () => {
+      restore();
+      if (!answered) reject(ended());
+    });
+
+    rl.question(question, (answer) => {
+      answered = true;
       rl.close();
       resolve(answer.trim());
     });
+
+    if (onAsked) restore = onAsked();
   });
 }
 
-export async function promptSecret(message: string): Promise<string> {
-  const rl = createInterface({
-    input: process.stdin,
-    output: process.stderr,
-  });
+export async function promptInput(message: string): Promise<string> {
+  return ask(`${message} `);
+}
 
-  // Mute output for secret input
-  const originalWrite = process.stderr.write.bind(process.stderr);
-  return new Promise((resolve) => {
-    rl.question(`${message} `, (answer) => {
-      process.stderr.write = originalWrite;
-      console.error(); // newline after hidden input
-      rl.close();
-      resolve(answer.trim());
-    });
-    // Hide characters after the prompt is displayed
-    process.stderr.write = (data: string | Uint8Array) => {
+export async function promptSecret(message: string): Promise<string> {
+  // Mute the echoed characters once the prompt is shown, and give stderr back however the question ends.
+  return ask(`${message} `, () => {
+    const originalWrite = process.stderr.write;
+    process.stderr.write = ((data: string | Uint8Array, ...rest: unknown[]) => {
       // Only suppress the echoed characters, not the prompt itself
       if (typeof data === 'string' && data.length === 1) return true;
-      return originalWrite(data);
+      return (originalWrite as (...args: unknown[]) => boolean).call(process.stderr, data, ...rest);
+    }) as typeof process.stderr.write;
+    return () => {
+      process.stderr.write = originalWrite;
+      console.error(); // newline after hidden input
     };
   });
 }
@@ -44,22 +65,9 @@ export async function promptSelect(message: string, choices: string[]): Promise<
     console.error(`  ${i + 1}. ${choice}`);
   });
 
-  const rl = createInterface({
-    input: process.stdin,
-    output: process.stderr,
-  });
-
-  return new Promise((resolve) => {
-    rl.question('Enter selection: ', (answer) => {
-      rl.close();
-      const index = parseInt(answer, 10) - 1;
-      if (index >= 0 && index < choices.length) {
-        resolve(choices[index]);
-      } else {
-        resolve(choices[0]);
-      }
-    });
-  });
+  const answer = await ask('Enter selection: ', undefined, message);
+  const index = parseInt(answer, 10) - 1;
+  return index >= 0 && index < choices.length ? choices[index] : choices[0];
 }
 
 export async function promptConfirm(message: string, defaultValue = true): Promise<boolean> {
