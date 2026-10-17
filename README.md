@@ -172,6 +172,8 @@ cloudcart nitrogen deploy
 | `cloudcart nitrogen init` | Create a Nitrogen storefront project from the CloudCart starter |
 | `cloudcart nitrogen link` | Link the project to a CloudCart store and its storefront |
 | `cloudcart nitrogen env pull` | Write the storefront's variables into `.env` |
+| `cloudcart nitrogen env list` | List the storefront's variables on CloudCart (`--env`); secrets masked |
+| `cloudcart nitrogen env push` | Set `.env`'s custom variables for one environment (`--env`, default `production`): shows the keys that change, asks first, deletes nothing; never sends the platform's variables or `SESSION_SECRET` |
 | `cloudcart nitrogen dev` | Start the development server |
 | `cloudcart nitrogen build` | Build the storefront for production |
 | `cloudcart nitrogen deploy` | Deploy the storefront to Nova (CloudCart Edge Hosting) |
