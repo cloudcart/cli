@@ -1,93 +1,68 @@
 import { Command, Flags, Args } from '@oclif/core';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { logger, printBanner } from '@cloudcart/cli-kit';
-import { resolveProjectRoot } from '../../../lib/project.js';
-
-const ROUTE_TEMPLATES: Record<string, { file: string; description: string }> = {
-  'products.$handle': { file: 'products.$handle.tsx', description: 'Product detail page' },
-  'products._index': { file: 'products._index.tsx', description: 'Products listing' },
-  'collections.$handle': { file: 'collections.$handle.tsx', description: 'Collection page' },
-  'collections._index': { file: 'collections._index.tsx', description: 'Collections listing' },
-  'cart': { file: 'cart.tsx', description: 'Shopping cart' },
-  'search': { file: 'search.tsx', description: 'Search page' },
-  'pages.$handle': { file: 'pages.$handle.tsx', description: 'CMS pages' },
-  'account': { file: 'account.tsx', description: 'Account layout' },
-  'account._index': { file: 'account._index.tsx', description: 'Account overview' },
-  '[robots.txt]': { file: '[robots.txt].tsx', description: 'Robots.txt generation' },
-  '[sitemap.xml]': { file: '[sitemap.xml].tsx', description: 'Sitemap generation' },
-};
+import { resolveProjectRoot, validateProject } from '../../../lib/project.js';
+import { copyRoute, missingImports, starterRoutes } from '../../../lib/routes.js';
+import { STARTER_REPOSITORY, withStarter, type StarterSource } from '../../../lib/starter.js';
 
 export default class NitrogenGenerateRoute extends Command {
-  static override description = 'Generate a Nitrogen route from template';
+  static override description = "Copy one of the CloudCart starter's routes into the project";
 
   static override examples = [
-    '<%= config.bin %> nitrogen generate route products.$handle',
-    '<%= config.bin %> nitrogen generate route cart',
+    '<%= config.bin %> nitrogen generate route product.$handle',
+    '<%= config.bin %> nitrogen generate route cart --force',
   ];
 
   static override args = {
-    name: Args.string({ description: 'Route name (e.g., products.$handle, cart, search)', required: true }),
+    name: Args.string({
+      description: "The route's file name in the starter's app/routes, without the extension (e.g. product.$handle, category.$handle, cart)",
+      required: true,
+    }),
   };
 
   static override flags = {
-    force: Flags.boolean({ description: 'Overwrite existing route', default: false }),
+    force: Flags.boolean({ description: 'Overwrite the route if the project has it', default: false }),
     path: Flags.string({ description: 'Path to the Nitrogen storefront root', default: '.' }),
+    template: Flags.string({
+      description: `A local git repository to take the route from, instead of the published starter (${STARTER_REPOSITORY}); its last commit is used`,
+    }),
   };
 
   async run(): Promise<void> {
     const { args, flags } = await this.parse(NitrogenGenerateRoute);
     const root = resolveProjectRoot(flags.path);
+    validateProject(root);
 
     printBanner();
 
-    const routesDir = resolve(root, 'app/routes');
-    if (!existsSync(routesDir)) mkdirSync(routesDir, { recursive: true });
+    const source: StarterSource = flags.template ? { kind: 'local', directory: resolve(flags.template) } : { kind: 'published' };
 
-    const template = ROUTE_TEMPLATES[args.name];
-    const fileName = template?.file ?? `${args.name}.tsx`;
-    const filePath = resolve(routesDir, fileName);
+    let outcome: { file: string; result: 'written' | 'kept' } | { unknown: string[] };
+    try {
+      outcome = await withStarter(source, (starter) => {
+        const routes = starterRoutes(starter);
+        const file = routes.get(args.name);
+        return file ? { file, result: copyRoute(starter, root, file, flags.force) } : { unknown: [...routes.keys()] };
+      });
+    } catch (error) {
+      logger.error((error as Error).message);
+      this.exit(1);
+    }
 
-    if (existsSync(filePath) && !flags.force) {
-      logger.warn(`Route "${fileName}" already exists. Use --force to overwrite.`);
+    if ('unknown' in outcome) {
+      logger.error(`The starter has no route "${args.name}". Its routes: ${outcome.unknown.join(', ')}`);
+      this.exit(1);
+    }
+
+    if (outcome.result === 'kept') {
+      logger.warn(`app/routes/${outcome.file} is already in the project: kept. Run again with --force to overwrite it.`);
       return;
     }
 
-    writeFileSync(filePath, generateRouteContent(args.name));
-    logger.success(`Generated route: app/routes/${fileName}`);
+    logger.success(`Copied the starter's app/routes/${outcome.file}`);
+    const missing = missingImports(root, outcome.file);
+    if (missing.length) {
+      logger.warn(`It imports modules this project does not have: ${missing.join(', ')}. Copy them from the starter too.`);
+    }
   }
-}
-
-function generateRouteContent(routeName: string): string {
-  const capitalized = routeName
-    .replace(/[.$\[\]]/g, ' ')
-    .trim()
-    .split(/\s+/)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join('');
-
-  return `import {useLoaderData} from 'react-router';
-import type {Route} from './+types/${ROUTE_TEMPLATES[routeName]?.file.replace('.tsx', '') ?? routeName}';
-import {getContext} from '~/lib/context';
-import {getSeoMeta} from '@cloudcart/nitrogen';
-
-export const meta: Route.MetaFunction = () => getSeoMeta({title: '${capitalized} | Nitrogen'});
-
-export async function loader({context, request}: Route.LoaderArgs) {
-  const ctx = await getContext(context, request);
-  // TODO: Load data from storefront
-  return {};
-}
-
-export default function ${capitalized}Route() {
-  const data = useLoaderData<typeof loader>();
-
-  return (
-    <div>
-      <h1>${capitalized}</h1>
-      <p>Generated by CloudCart CLI.</p>
-    </div>
-  );
-}
-`;
 }

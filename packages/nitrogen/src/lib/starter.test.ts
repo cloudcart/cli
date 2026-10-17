@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { Header } from 'tar';
 import { afterEach, describe, expect, it } from 'vitest';
-import { starterArchiveUrl, unpackStarter } from './starter.js';
+import { starterArchiveUrl, unpackStarter, withStarter } from './starter.js';
 
 const folders: string[] = [];
 
@@ -147,5 +147,31 @@ describe('unpackStarter from the published starter', () => {
   it('refuses an archive that is not a Nitrogen project', async () => {
     const archive = tarball([{ path: 'top/README.md', body: '# Not a starter\n' }]);
     await expect(unpackStarter({ kind: 'published' }, folder(), answering(archive))).rejects.toThrow(/no package\.json/);
+  });
+});
+
+describe('withStarter', () => {
+  const archive = () => tarball([{ path: 'top/package.json', body: '{"name":"nitrogen-starter"}\n' }]);
+
+  it('hands over the unpacked starter and removes it after', async () => {
+    let seen = '';
+    const name = await withStarter({ kind: 'published' }, (root) => {
+      seen = root;
+      return JSON.parse(readFileSync(join(root, 'package.json'), 'utf-8')).name;
+    }, answering(archive()));
+
+    expect(name).toBe('nitrogen-starter');
+    expect(existsSync(seen)).toBe(false);
+  });
+
+  it('removes it when the use fails too', async () => {
+    let seen = '';
+    await expect(
+      withStarter({ kind: 'published' }, (root) => {
+        seen = root;
+        throw new Error('the use failed');
+      }, answering(archive())),
+    ).rejects.toThrow('the use failed');
+    expect(existsSync(seen)).toBe(false);
   });
 });

@@ -175,6 +175,8 @@ cloudcart nitrogen deploy
 | `cloudcart nitrogen dev` | Start the development server |
 | `cloudcart nitrogen build` | Build the storefront for production |
 | `cloudcart nitrogen deploy` | Deploy the storefront to Nova (CloudCart Edge Hosting) |
+| `cloudcart nitrogen generate route <name>` | Copy one of the starter's routes into the project (`product.$handle`, `category.$handle`, `cart`, …) |
+| `cloudcart nitrogen generate routes` | Copy the starter's routes the project does not have |
 
 ## AI-First Design
 
@@ -194,7 +196,7 @@ packages/
   cli/          # @cloudcart/cli — Command definitions (oclif)
   cli-kit/      # @cloudcart/cli-kit — Auth, API client, UI, error handling
   app/          # @cloudcart/app — App commands (execute, schema, validate)
-  nitrogen/     # @cloudcart/nitrogen-plugin — Nitrogen storefront commands (init, link, env, dev, build, deploy)
+  nitrogen/     # @cloudcart/nitrogen-plugin — Nitrogen storefront commands (init, link, env, dev, build, deploy, generate)
   theme/        # @cloudcart/theme — Theme commands (coming soon)
 ```
 

@@ -3,8 +3,9 @@
  */
 
 import { execFile } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import type { ReadableStream as NodeReadableStream } from 'node:stream/web';
@@ -46,6 +47,23 @@ export async function unpackStarter(
 
   if (!existsSync(resolve(destination, 'package.json'))) {
     throw new Error('The starter has no package.json: it is not a Nitrogen project.');
+  }
+}
+
+/**
+ * Unpacks the starter into a temporary folder for `use`, and removes the folder after, whatever `use` does.
+ */
+export async function withStarter<T>(
+  source: StarterSource,
+  use: (starterRoot: string) => T | Promise<T>,
+  fetchArchive: typeof fetch = fetch,
+): Promise<T> {
+  const folder = mkdtempSync(join(tmpdir(), 'cloudcart-starter-'));
+  try {
+    await unpackStarter(source, folder, fetchArchive);
+    return await use(folder);
+  } finally {
+    rmSync(folder, { recursive: true, force: true });
   }
 }
 
