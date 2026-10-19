@@ -5,17 +5,12 @@ import { logger, colors, printNitrogenBanner, promptInput, promptSelect, printGr
 import { exec } from '../../lib/project.js';
 import { packageName, prepareProject, unsupportedNode, type PackageManager, type StoreConnection } from '../../lib/new-project.js';
 import { STARTER_REPOSITORY, unpackStarter, type StarterSource } from '../../lib/starter.js';
-import { DEMO_STORE } from '../../lib/demo-store.js';
-
-const MOCK_STORE = `Mock store (CloudCart's demo store, ${DEMO_STORE.domain})`;
-const CONNECT_STORE = 'Connect to a CloudCart store';
 
 export default class NitrogenInit extends Command {
   static override description = 'Create a new Nitrogen storefront project from the CloudCart starter';
 
   static override examples = [
     '<%= config.bin %> nitrogen init my-store',
-    '<%= config.bin %> nitrogen init my-store --quickstart',
     '<%= config.bin %> nitrogen init my-store --template ../my-starter',
   ];
 
@@ -24,10 +19,6 @@ export default class NitrogenInit extends Command {
   };
 
   static override flags = {
-    quickstart: Flags.boolean({
-      description: "Use defaults (CloudCart's demo store, npm)",
-      default: false,
-    }),
     'package-manager': Flags.string({
       description: 'Package manager to use',
       options: ['npm', 'pnpm', 'yarn'],
@@ -44,13 +35,11 @@ export default class NitrogenInit extends Command {
 
     printNitrogenBanner();
 
-    // ── Interactive prompts (skipped with --quickstart) ──
-
-    const isQuickstart = flags.quickstart;
+    // ── Interactive prompts ──
 
     // Project name
     let projectName = args.name;
-    if (!projectName && !isQuickstart) {
+    if (!projectName) {
       projectName = await promptInput('Project name:');
     }
     projectName = projectName?.trim() || 'my-nitrogen-store';
@@ -61,17 +50,13 @@ export default class NitrogenInit extends Command {
       this.exit(1);
     }
 
-    // Store connection
-    const storeMode = isQuickstart ? MOCK_STORE : await promptSelect('Store:', [MOCK_STORE, CONNECT_STORE]);
-    let store: StoreConnection | undefined = storeMode === MOCK_STORE ? DEMO_STORE : undefined;
-    if (storeMode === CONNECT_STORE) {
-      const domain = (await promptInput('Store domain (e.g., mystore.cloudcart.com):')).trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
-      if (domain) store = { domain };
-    }
+    // Store connection: an empty domain leaves it to `link` and `env pull`.
+    const domain = (await promptInput('Store domain (e.g., mystore.cloudcart.com):')).trim().replace(/^https?:\/\//, '').replace(/\/$/, '');
+    const store: StoreConnection | undefined = domain ? { domain } : undefined;
 
     // Package manager
     let pm = flags['package-manager'] as PackageManager | undefined;
-    if (!pm && !isQuickstart) {
+    if (!pm) {
       pm = (await promptSelect('Package manager:', ['npm', 'pnpm', 'yarn'])) as PackageManager;
     }
     pm = pm || 'npm';
@@ -83,7 +68,7 @@ export default class NitrogenInit extends Command {
     // ── Summary ──
 
     printInfoBox('Configuration', [
-      `Store:      ${colors.bold(store?.domain || storeMode)}`,
+      `Store:      ${colors.bold(store?.domain || 'not set, link it later')}`,
       `Package:    ${colors.bold(pm)}`,
       `Starter:    ${colors.bold(source.kind === 'local' ? source.directory : STARTER_REPOSITORY)}`,
       `Path:       ${colors.dim(projectPath)}`,
@@ -147,14 +132,9 @@ export default class NitrogenInit extends Command {
     printInfoBox('Next steps', [
       colors.bold(`cd ${projectName}`),
       ...(installed ? [] : [colors.bold(`${pm} install`)]),
-      // Without a public token the project reaches no store until it is linked and its variables pulled; the
-      // demo store's is in `.env` already, and linking moves the project to the developer's own store.
+      // Without a public token the project reaches no store until it is linked and its variables pulled.
       '',
-      colors.dim(
-        store === DEMO_STORE
-          ? `The project shows the demo store (${DEMO_STORE.domain}). For your own store:`
-          : 'Link the project to your storefront and pull its variables:',
-      ),
+      colors.dim('Link the project to your storefront and pull its variables:'),
       colors.bold('cloudcart nitrogen link'),
       colors.bold('cloudcart nitrogen env pull'),
       '',

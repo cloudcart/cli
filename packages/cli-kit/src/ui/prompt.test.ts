@@ -21,7 +21,7 @@ describe('prompts with an answer', () => {
 
   it('chooses by number', async () => {
     input('2\n');
-    await expect(promptSelect('Store:', ['Mock store', 'Connect'])).resolves.toBe('Connect');
+    await expect(promptSelect('Package manager:', ['npm', 'pnpm'])).resolves.toBe('pnpm');
   });
 
   it('confirms', async () => {
@@ -33,7 +33,7 @@ describe('prompts with an answer', () => {
 describe('prompts whose input ended (B-462)', () => {
   it.each([
     ['promptInput', () => promptInput('Project name:'), 'Project name:'],
-    ['promptSelect', () => promptSelect('Store:', ['Mock store', 'Connect']), 'Store:'],
+    ['promptSelect', () => promptSelect('Package manager:', ['npm', 'pnpm']), 'Package manager:'],
     ['promptConfirm', () => promptConfirm('Write?'), 'Write? [Y/n]'],
     ['promptSecret', () => promptSecret('Token:'), 'Token:'],
   ])('%s says the input ended and how to answer instead', async (_name, ask, question) => {

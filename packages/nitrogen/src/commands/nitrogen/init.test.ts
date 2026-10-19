@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { DEMO_STORE } from '../../lib/demo-store.js';
+import * as cliKit from '@cloudcart/cli-kit';
 import { exec, loadEnvFile } from '../../lib/project.js';
 import NitrogenInit from './init.js';
 
@@ -13,12 +13,22 @@ vi.mock('../../lib/project.js', async (importOriginal) => ({
   exec: vi.fn(async () => {}),
 }));
 
+// The questions are answered by the tests; the real prompts are used where a test wants them.
+vi.mock('@cloudcart/cli-kit', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@cloudcart/cli-kit')>();
+  return { ...original, promptInput: vi.fn(original.promptInput), promptSelect: vi.fn(original.promptSelect) };
+});
+
 const run = vi.mocked(exec);
+const askInput = vi.mocked(cliKit.promptInput);
+const askSelect = vi.mocked(cliKit.promptSelect);
 const folders: string[] = [];
 let output: string[] = [];
 
 beforeEach(() => {
   output = [];
+  askInput.mockResolvedValue('');
+  askSelect.mockResolvedValue('npm');
   for (const method of ['log', 'error', 'warn'] as const) {
     vi.spyOn(console, method).mockImplementation((...args: unknown[]) => void output.push(args.join(' ')));
   }
@@ -30,6 +40,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
   run.mockReset();
   run.mockImplementation(async () => {});
+  askInput.mockReset();
+  askSelect.mockReset();
 });
 
 function folder(): string {
@@ -65,7 +77,7 @@ const calls = () => run.mock.calls.map(([command, args, cwd]) => `${[command, ..
 describe('nitrogen init', () => {
   it('makes the project from the starter, then runs git init and the install there (T-502)', async () => {
     const path = join(folder(), 'my-store');
-    await init(path, '--quickstart', '--template', starter());
+    await init(path, '--template', starter());
 
     const pkg = JSON.parse(readFileSync(join(path, 'package.json'), 'utf-8'));
     expect(pkg.name).toBe('my-store');
@@ -78,21 +90,30 @@ describe('nitrogen init', () => {
     expect(output.join('\n')).toContain('Created');
   });
 
-  it("connects the project to CloudCart's demo store with --quickstart, and says how to use one's own (T-502, Q-74)", async () => {
+  it('asks for the store domain, writes it to .env and says to link the project', async () => {
     const path = join(folder(), 'store');
-    await init(path, '--quickstart', '--no-git', '--no-install', '--template', starter());
+    askInput.mockResolvedValue('https://shop.example.com/');
+    await init(path, '--no-git', '--no-install', '--template', starter());
+
+    expect(askInput).toHaveBeenCalledWith('Store domain (e.g., mystore.cloudcart.com):');
+    expect(askSelect).toHaveBeenCalledWith('Package manager:', ['npm', 'pnpm', 'yarn']);
+    expect(askSelect).not.toHaveBeenCalledWith('Store:', expect.anything());
 
     const env = loadEnvFile(join(path, '.env'));
-    expect(env.PUBLIC_STORE_DOMAIN).toBe('bigrelease.com');
-    expect(env.PUBLIC_STOREFRONT_API_TOKEN).toBe(DEMO_STORE.publicToken);
-    expect(DEMO_STORE.publicToken).toMatch(/^[A-Za-z0-9]{64}$/);
-    expect(output.join('\n')).toContain('The project shows the demo store (bigrelease.com). For your own store:');
+    expect(env.PUBLIC_STORE_DOMAIN).toBe('shop.example.com');
+    expect(env.PUBLIC_STOREFRONT_API_TOKEN).toBeFalsy();
     expect(output.join('\n')).toContain('cloudcart nitrogen link');
+  });
+
+  it('has no --quickstart flag any more', async () => {
+    const path = join(folder(), 'store');
+    await expect(init(path, '--quickstart', '--template', starter())).rejects.toThrow(/Nonexistent flag: --quickstart/);
+    expect(existsSync(path)).toBe(false);
   });
 
   it('installs with the chosen package manager and leaves npm\'s lockfile to npm', async () => {
     const path = join(folder(), 'store');
-    await init(path, '--quickstart', '--package-manager', 'pnpm', '--no-git', '--template', starter());
+    await init(path, '--package-manager', 'pnpm', '--no-git', '--template', starter());
 
     expect(calls()).toEqual([`pnpm install in ${path}`]);
     expect(existsSync(join(path, 'package-lock.json'))).toBe(false);
@@ -100,7 +121,7 @@ describe('nitrogen init', () => {
 
   it('runs nothing with --no-git --no-install, and says to install', async () => {
     const path = join(folder(), 'store');
-    await init(path, '--quickstart', '--no-git', '--no-install', '--template', starter());
+    await init(path, '--no-git', '--no-install', '--template', starter());
 
     expect(run).not.toHaveBeenCalled();
     expect(output.join('\n')).toContain('npm install');
@@ -108,7 +129,7 @@ describe('nitrogen init', () => {
 
   it('refuses a folder that exists', async () => {
     const path = folder();
-    await expect(init(path, '--quickstart', '--template', starter())).rejects.toMatchObject({ oclif: { exit: 1 } });
+    await expect(init(path, '--template', starter())).rejects.toMatchObject({ oclif: { exit: 1 } });
     expect(output.join('\n')).toContain('already exists');
     expect(run).not.toHaveBeenCalled();
   });
@@ -116,7 +137,7 @@ describe('nitrogen init', () => {
   it('leaves no folder behind when the starter cannot be downloaded', async () => {
     vi.stubGlobal('fetch', async () => new Response(null, { status: 503, statusText: 'Service Unavailable' }));
     const path = join(folder(), 'store');
-    await expect(init(path, '--quickstart')).rejects.toMatchObject({ oclif: { exit: 1 } });
+    await expect(init(path)).rejects.toMatchObject({ oclif: { exit: 1 } });
 
     expect(existsSync(path)).toBe(false);
     expect(output.join('\n')).toContain('Could not download the starter from https://codeload.github.com/cloudcart/nitro-starter/tar.gz/refs/heads/main: 503 Service Unavailable');
@@ -127,13 +148,14 @@ describe('nitrogen init', () => {
       if (command === 'npm') throw new Error('Process exited with code 1');
     });
     const path = join(folder(), 'store');
-    await expect(init(path, '--quickstart', '--template', starter())).rejects.toMatchObject({ oclif: { exit: 1 } });
+    await expect(init(path, '--template', starter())).rejects.toMatchObject({ oclif: { exit: 1 } });
 
     expect(existsSync(join(path, 'package.json'))).toBe(true);
     expect(output.join('\n')).toContain('The install failed (Process exited with code 1)');
   });
 
   it('says the input ended when it has a question and no terminal (B-462)', async () => {
+    askInput.mockImplementation((await vi.importActual<typeof import('@cloudcart/cli-kit')>('@cloudcart/cli-kit')).promptInput);
     vi.spyOn(process, 'stdin', 'get').mockReturnValue(Readable.from([]) as unknown as typeof process.stdin);
     await expect(init('--template', starter())).rejects.toThrow('No answer to "Project name:": the input ended');
     expect(run).not.toHaveBeenCalled();
