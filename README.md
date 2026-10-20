@@ -143,7 +143,7 @@ cloudcart nitrogen build
 cloudcart nitrogen deploy
 ```
 
-`init` downloads the starter, names the project after its folder, sets the Nitrogen packages to `^2.0.0`, writes `.env` from the starter's `.env.example` with a new random `SESSION_SECRET`, runs `git init` and installs the dependencies. It asks for your store's domain and writes it to `.env`; `link` and `env pull` then connect the project to your storefront and fetch its variables.
+`init` downloads the starter, names the project after its folder, keeps the starter's own Nitrogen version range (a local link or workspace range becomes `^2.0.0`), writes `.env` from the starter's `.env.example` with a new random `SESSION_SECRET`, runs `git init` and installs the dependencies. It asks for your store's domain and writes it to `.env`; `link` and `env pull` then connect the project to your storefront and fetch its variables.
 
 `init`'s flags:
 
