@@ -212,4 +212,18 @@ describe('AppSchema', () => {
     expect(fn(null)).toBe('Unknown');
     expect(fn(undefined)).toBe('Unknown');
   });
+
+  it('writes SDL to a .graphql or .gql file and JSON otherwise, unless a flag says which (B-506)', () => {
+    const instance = new AppSchema([], {} as never);
+    const flags = { json: false, compact: false, 'mutations-only': false, 'queries-only': false };
+
+    expect(instance.format({ ...flags })).toBe('json');
+    expect(instance.format({ ...flags, output: 'schema.json' })).toBe('json');
+    expect(instance.format({ ...flags, output: 'schema.graphql' })).toBe('sdl');
+    expect(instance.format({ ...flags, output: 'admin.GQL' })).toBe('sdl');
+    expect(instance.format({ ...flags, output: 'schema.graphql', json: true })).toBe('json');
+    expect(instance.format({ ...flags, output: 'schema.graphql', compact: true })).toBe('compact');
+    // A filtered schema cannot be printed as SDL: it lacks the types its fields point to.
+    expect(instance.format({ ...flags, output: 'schema.graphql', search: 'product' })).toBe('compact');
+  });
 });

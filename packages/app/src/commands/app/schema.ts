@@ -1,5 +1,6 @@
 import { Command, Flags } from '@oclif/core';
 import { writeFile } from 'node:fs/promises';
+import { buildClientSchema, printSchema, type IntrospectionQuery } from 'graphql';
 import {
   getSession,
   createGraphQLClient,
@@ -76,7 +77,7 @@ export default class AppSchema extends Command {
     }),
     output: Flags.string({
       char: 'o',
-      description: 'Write schema to a file instead of stdout',
+      description: 'Write schema to a file instead of stdout: a .graphql or .gql file gets the SDL, any other the JSON, unless --compact or --json says',
     }),
     compact: Flags.boolean({
       char: 'c',
@@ -99,7 +100,7 @@ export default class AppSchema extends Command {
       default: false,
     }),
     json: Flags.boolean({
-      description: 'Output raw JSON introspection',
+      description: 'Output raw JSON introspection (the default, except for a .graphql or .gql file)',
       default: false,
     }),
   };
@@ -152,9 +153,11 @@ export default class AppSchema extends Command {
         return;
       }
 
-      const output = flags.compact
-        ? this.toCompactSDL(filteredSchema)
-        : JSON.stringify({ __schema: filteredSchema }, null, 2);
+      const output = {
+        compact: () => this.toCompactSDL(filteredSchema),
+        sdl: () => printSchema(buildClientSchema({ __schema: filteredSchema } as unknown as IntrospectionQuery)),
+        json: () => JSON.stringify({ __schema: filteredSchema }, null, 2),
+      }[this.format(flags)]();
 
       if (flags.output) {
         await writeFile(flags.output, output, 'utf-8');
@@ -295,6 +298,17 @@ export default class AppSchema extends Command {
     if (!ref) return null;
     if (ref.name) return ref.name;
     return this.extractTypeName(ref.ofType);
+  }
+
+  /**
+   * JSON unless a flag says otherwise; a .graphql or .gql file gets the SDL, which is what such a file holds
+   * (B-506). A filtered schema lacks the types its fields point to, so it is SDL-like only: the compact form.
+   */
+  format(flags: { json: boolean; compact: boolean; output?: string; search?: string; 'mutations-only': boolean; 'queries-only': boolean }): 'json' | 'compact' | 'sdl' {
+    if (flags.json) return 'json';
+    if (flags.compact) return 'compact';
+    if (!flags.output || !/\.(graphql|gql)$/i.test(flags.output)) return 'json';
+    return flags.search || flags['mutations-only'] || flags['queries-only'] ? 'compact' : 'sdl';
   }
 
   /** Convert introspection JSON to compact SDL-like format optimized for LLM consumption */
