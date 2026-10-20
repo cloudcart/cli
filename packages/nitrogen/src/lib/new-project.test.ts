@@ -70,7 +70,7 @@ describe('packageName', () => {
 });
 
 describe('prepareProject', () => {
-  it('names the project and points every Nitrogen package to the published release', () => {
+  it('names the project and points a Nitrogen package on a local pack to the published release', () => {
     const root = starter();
     prepareProject(root, { name: 'my-store', packageManager: 'npm' });
     const pkg = packageJson(root);
@@ -88,6 +88,21 @@ describe('prepareProject', () => {
     });
     expect(NITROGEN_RANGE).toBe('^2.0.0');
     expect(readFileSync(join(root, 'package.json'), 'utf-8')).not.toContain('file:');
+  });
+
+  it("keeps the starter's own published range, which matches its code (B-504)", () => {
+    const root = starter();
+    const path = join(root, 'package.json');
+    const pkg = JSON.parse(readFileSync(path, 'utf-8'));
+    pkg.dependencies['@cloudcart/nitrogen'] = '^2.1.0';
+    pkg.dependencies['@cloudcart/nitrogen-react'] = '~2.1.3';
+    pkg.devDependencies['@cloudcart/nitrogen-codegen'] = 'workspace:*';
+    writeFileSync(path, JSON.stringify(pkg));
+
+    prepareProject(root, { name: 'my-store', packageManager: 'npm' });
+
+    expect(packageJson(root).dependencies).toMatchObject({ '@cloudcart/nitrogen': '^2.1.0', '@cloudcart/nitrogen-react': '~2.1.3' });
+    expect(packageJson(root).devDependencies).toMatchObject({ '@cloudcart/nitrogen-codegen': NITROGEN_RANGE });
   });
 
   it('keeps npm\'s lockfile for npm and removes it for pnpm and yarn', () => {

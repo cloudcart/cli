@@ -8,7 +8,7 @@ import { basename, resolve } from 'node:path';
 import semver from 'semver';
 import { newSessionSecret } from './session-secret.js';
 
-/** The Nitrogen release a new project installs (§8). */
+/** The Nitrogen release a starter that points to local packs gets instead (§8). */
 export const NITROGEN_RANGE = '^2.0.0';
 
 /** `@cloudcart/nitrogen`, `@cloudcart/nitrogen-react`, `@cloudcart/nitrogen-codegen`. */
@@ -39,8 +39,9 @@ export function packageName(folder: string): string {
 
 /**
  * Makes the starter in `root` the developer's project:
- * - `package.json` takes the project's name, and every Nitrogen package the published range, whatever the
- *   starter pointed to (a local starter installs from local packs);
+ * - `package.json` takes the project's name; a Nitrogen package keeps the starter's own version range, which
+ *   matches the starter's code, and only one that is not a published version (a local starter's `file:` pack,
+ *   `workspace:`, a link) gets `NITROGEN_RANGE` (B-504);
  * - npm keeps the starter's `package-lock.json`; pnpm and yarn make their own lockfile, so it is removed;
  * - `.env` is written from `.env.example` (see `envFileText`), readable by its owner only.
  */
@@ -51,7 +52,9 @@ export function prepareProject(root: string, options: ProjectOptions): void {
   for (const field of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
     const dependencies = pkg[field] as Record<string, string> | undefined;
     for (const dependency of Object.keys(dependencies ?? {})) {
-      if (NITROGEN_PACKAGE.test(dependency)) dependencies![dependency] = NITROGEN_RANGE;
+      if (NITROGEN_PACKAGE.test(dependency) && !semver.validRange(dependencies![dependency])) {
+        dependencies![dependency] = NITROGEN_RANGE;
+      }
     }
   }
   writeFileSync(packagePath, JSON.stringify(pkg, null, 2) + '\n');
