@@ -53,4 +53,37 @@ describe('exec (B-463)', () => {
   it('fails when the process was ended by a signal: a killed build is not a finished one (B-502)', async () => {
     await expect(exec(process.execPath, ['-e', 'process.kill(process.pid, "SIGKILL")'], folder())).rejects.toThrow('Process ended by signal SIGKILL');
   });
+
+  it('passes a stop signal the CLI receives on to a server, and the stop is not a failure (B-503)', async () => {
+    const cwd = folder();
+    const before = process.listenerCount('SIGTERM');
+    // A server that writes its pid and runs until it is stopped.
+    const running = exec(process.execPath, ['-e', 'require("fs").writeFileSync("pid", String(process.pid)); setInterval(() => {}, 1000)'], cwd, {}, { forwardSignals: true });
+    await vi.waitFor(() => readFileSync(join(cwd, 'pid'), 'utf-8'), { timeout: 5000 });
+    const pid = Number(readFileSync(join(cwd, 'pid'), 'utf-8'));
+    try {
+      expect(process.listenerCount('SIGTERM')).toBe(before + 1);
+
+      // The listener alone: the test's own process is not signalled.
+      process.emit('SIGTERM', 'SIGTERM');
+      await expect(running).resolves.toBeUndefined();
+
+      expect(() => process.kill(pid, 0)).toThrow();
+      expect(process.listenerCount('SIGTERM')).toBe(before);
+    } finally {
+      // A failed run leaves no server behind.
+      try {
+        process.kill(pid);
+      } catch {
+        // Already stopped.
+      }
+    }
+  });
+
+  it('leaves the signals alone for a program that is not a server', async () => {
+    const before = process.listenerCount('SIGTERM');
+    const running = exec(process.execPath, ['-e', ''], folder());
+    expect(process.listenerCount('SIGTERM')).toBe(before);
+    await running;
+  });
 });

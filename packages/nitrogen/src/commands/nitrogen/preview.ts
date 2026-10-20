@@ -1,6 +1,6 @@
 import { Command, Flags } from '@oclif/core';
 import { resolve } from 'node:path';
-import { logger, colors, printBanner } from '@cloudcart/cli-kit';
+import { logger, printBanner } from '@cloudcart/cli-kit';
 import { resolveProjectRoot, validateProject, loadEnvFile, exec } from '../../lib/project.js';
 
 export default class NitrogenPreview extends Command {
@@ -33,11 +33,12 @@ export default class NitrogenPreview extends Command {
       console.log();
     }
 
-    logger.info(`Starting preview server → ${colors.bold(`http://localhost:${flags.port}`)}`);
+    // Vite takes the next free port when this one is busy: its "Local" line gives the address (B-503).
+    logger.info(`Starting the preview server on port ${flags.port}...`);
     console.log();
 
     await exec('npx', ['vite', 'preview', '--port', String(flags.port)], root, {
       ...envVars, NODE_ENV: 'production',
-    });
+    }, { forwardSignals: true });
   }
 }

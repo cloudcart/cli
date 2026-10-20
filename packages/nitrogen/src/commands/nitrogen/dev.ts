@@ -51,11 +51,12 @@ export default class NitrogenDev extends Command {
     const args = ['react-router', 'dev', '--port', String(flags.port)];
     if (flags.host) args.push('--host');
 
-    logger.info(`Dev server → ${colors.bold(`http://localhost:${flags.port}`)}`);
+    // Vite takes the next free port when this one is busy: its "Local" line gives the address (B-503).
+    logger.info(`Starting the dev server on port ${flags.port}...`);
     console.log();
 
     try {
-      await exec('npx', args, root, { ...envVars, PORT: String(flags.port) });
+      await exec('npx', args, root, { ...envVars, PORT: String(flags.port) }, { forwardSignals: true });
     } finally {
       codegenWatch?.close();
     }

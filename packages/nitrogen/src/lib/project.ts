@@ -72,6 +72,7 @@ export function exec(
   args: string[],
   cwd: string,
   extraEnv: Record<string, string> = {},
+  options: { forwardSignals?: boolean } = {},
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
@@ -79,12 +80,31 @@ export function exec(
       stdio: 'inherit',
       env: { ...process.env, ...extraEnv },
     });
+
+    // A server runs until it is stopped. Ctrl+C in a terminal reaches the whole process group, but a SIGTERM or
+    // SIGHUP sent to the CLI alone — an editor's stop button, `kill` — would leave the server running without it
+    // (B-503): with `forwardSignals` the signal is passed on, and the stop it asked for is not a failure.
+    let stopped = false;
+    const pass = (signal: NodeJS.Signals) => {
+      stopped = true;
+      child.kill(signal);
+    };
+    const signals: NodeJS.Signals[] = options.forwardSignals ? ['SIGINT', 'SIGTERM', 'SIGHUP'] : [];
+    for (const signal of signals) process.on(signal, pass);
+    const release = () => {
+      for (const signal of signals) process.off(signal, pass);
+    };
+
     child.on('close', (code, signal) => {
-      if (code === 0) resolve();
+      release();
+      if (code === 0 || stopped) resolve();
       // A process ended by a signal has no exit code: it did not finish its work (B-502).
       else if (signal) reject(new Error(`Process ended by signal ${signal}`));
       else reject(new Error(`Process exited with code ${code}`));
     });
-    child.on('error', (error) => reject(new Error(`Could not run ${command}: ${error.message}`)));
+    child.on('error', (error) => {
+      release();
+      reject(new Error(`Could not run ${command}: ${error.message}`));
+    });
   });
 }
