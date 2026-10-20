@@ -40,6 +40,17 @@
     "commands": {
       "strategy": "pattern",
       "target": "./dist/commands"
+    },
+    "topics": {
+      "nitrogen": {
+        "description": "Nitrogen storefronts: create, link, develop, build and deploy to Nova"
+      },
+      "nitrogen:env": {
+        "description": "The linked storefront's environment variables: list, pull into .env, push"
+      },
+      "nitrogen:generate": {
+        "description": "Copy the CloudCart starter's routes into the project"
+      }
     }
   },
   "publishConfig": {

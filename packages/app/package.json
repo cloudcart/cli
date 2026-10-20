@@ -36,6 +36,11 @@
     "commands": {
       "strategy": "pattern",
       "target": "./dist/commands"
+    },
+    "topics": {
+      "app": {
+        "description": "The store's GraphQL Admin API: run a query, read the schema, validate a query"
+      }
     }
   },
   "publishConfig": {

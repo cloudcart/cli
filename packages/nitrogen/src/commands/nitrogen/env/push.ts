@@ -20,6 +20,9 @@ interface SetVariablesResponse {
   batchSetNitrogenEnvironmentVariables: Array<{ key: string; environment: string }> | null;
 }
 
+/** "1 variable", "2 variables" (B-485). */
+const count = (n: number) => `${n} variable${n === 1 ? '' : 's'}`;
+
 export default class NitrogenEnvPush extends Command {
   static override description =
     "Push the custom variables of a local .env to the linked storefront on CloudCart, for one environment. Shows what changes and asks first; deletes nothing";
@@ -90,10 +93,10 @@ export default class NitrogenEnvPush extends Command {
     const target = `"${environment}" of ${storefront.name} on ${storeName}`;
     if (!flags.force) {
       if (!(process.stdin.isTTY && process.stdout.isTTY)) {
-        logger.error(`Nothing pushed: run again with --force to push ${plan.send.length} variables to ${target} without a question.`);
+        logger.error(`Nothing pushed: run again with --force to push ${count(plan.send.length)} to ${target} without a question.`);
         this.exit(1);
       }
-      if (!(await promptConfirm(`Push ${plan.send.length} variables to ${target}?`, false))) {
+      if (!(await promptConfirm(`Push ${count(plan.send.length)} to ${target}?`, false))) {
         logger.info('Nothing pushed.');
         return;
       }
@@ -110,6 +113,6 @@ export default class NitrogenEnvPush extends Command {
       this.exit(1);
     }
 
-    logger.success(`${set.length} variables set for ${target}. The next deploy of "${environment}" binds them: \`cloudcart nitrogen deploy\`.`);
+    logger.success(`${count(set.length)} set for ${target}. The next deploy of "${environment}" binds them: \`cloudcart nitrogen deploy\`.`);
   }
 }

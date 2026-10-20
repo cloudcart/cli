@@ -90,6 +90,12 @@ describe('nitrogen env push', () => {
     expect(text).not.toContain('new.example.invalid');
   });
 
+  it('counts one variable as one (B-485)', async () => {
+    await push('--path', project('API_URL=https://new.example.invalid\n'), '--force');
+
+    expect(output.join('\n')).toContain('1 variable set for "production"');
+  });
+
   it('sends nothing when the environment already has the values', async () => {
     await push('--path', project('API_URL=https://old.example.invalid\n'), '--force');
 
