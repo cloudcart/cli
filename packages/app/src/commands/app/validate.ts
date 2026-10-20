@@ -1,20 +1,20 @@
 import { Command, Flags } from '@oclif/core';
 import { readFile } from 'node:fs/promises';
+import { buildClientSchema, GraphQLError, parse, validate, type DocumentNode, type IntrospectionQuery } from 'graphql';
 import {
   getSession,
   createGraphQLClient,
   logger,
   toStructuredError,
 } from '@cloudcart/cli-kit';
+import { INTROSPECTION_QUERY } from '../../lib/admin-schema.js';
 
 /**
- * Validates a GraphQL query against the store's schema without executing it.
- * Uses a POST with the query to the API — GraphQL servers return validation
- * errors in the `errors` array without executing invalid queries.
- * We add __typename to prevent actual data execution side effects.
+ * Validates a GraphQL document against the store's Admin API schema without executing it: the schema is read by
+ * introspection and the document is checked here, so a mutation is never sent to the store.
  */
 export default class AppValidate extends Command {
-  static override description = 'Validate a GraphQL query against the Admin API schema without executing it';
+  static override description = 'Validate a GraphQL query against the Admin API schema, locally: the query is never sent to the store';
 
   static override examples = [
     "<%= config.bin %> app validate --query '{ products { edges { node { titl } } } }'",
@@ -69,21 +69,37 @@ export default class AppValidate extends Command {
       this.exit(2);
     }
 
+    // A document that does not parse needs no schema.
+    let document: DocumentNode;
+    try {
+      document = parse(query!);
+    } catch (error) {
+      if (!(error instanceof GraphQLError)) throw error;
+      this.outputResult(jsonMode, false, [{ message: error.message, type: 'graphql_syntax_error', locations: error.locations }]);
+      this.exit(2);
+    }
+
     try {
       const session = await getSession({ storeUrl: flags.store, autoPrompt: false });
       const client = createGraphQLClient(session);
 
-      // Send the query — the server will validate it and return errors if invalid
-      // For mutations, we can't avoid execution, so we use introspection-based validation
-      const result = await client.query(query!);
+      // Only the introspection goes to the store; the document is checked here.
+      const result = await client.query(INTROSPECTION_QUERY);
+      const introspection = result.data as IntrospectionQuery | undefined;
 
-      if (result.errors?.length) {
-        const errors = result.errors.map(e => ({
-          message: e.message,
-          type: 'graphql_validation_error' as const,
-          locations: e.locations,
-          path: e.path,
-        }));
+      if (result.errors?.length || !introspection?.__schema) {
+        const message = result.errors?.map((e) => e.message).join('; ') || 'The store returned no schema.';
+        this.outputResult(jsonMode, false, [{ message: `Could not read the schema: ${message}`, type: 'schema_unavailable' }]);
+        this.exit(1);
+      }
+
+      const errors = validate(buildClientSchema(introspection), document!).map((e) => ({
+        message: e.message,
+        type: 'graphql_validation_error' as const,
+        locations: e.locations,
+      }));
+
+      if (errors.length) {
         this.outputResult(jsonMode, false, errors);
         this.exit(2);
       }

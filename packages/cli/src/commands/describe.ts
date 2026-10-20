@@ -72,7 +72,7 @@ const CLI_DESCRIPTION = {
       ],
     },
     'app validate': {
-      description: 'Validate a GraphQL query without executing it',
+      description: 'Validate a GraphQL query against the store\'s schema locally, without sending or executing it',
       flags: {
         '--query, -q': { type: 'string', description: 'Inline query to validate' },
         '--file, -f': { type: 'string', description: 'Path to .graphql file' },

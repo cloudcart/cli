@@ -55,7 +55,7 @@ cloudcart app schema --types-only
 
 ### Validate Queries
 \`\`\`bash
-# Catches field name typos and invalid syntax before execution
+# Checks against the store's schema locally: the document is never sent, so a mutation is safe to check
 cloudcart app validate --query '{ products { edges { node { titl } } } }' --json
 # Returns: {"valid":false,"errors":[{"message":"Cannot query field 'titl'...","type":"graphql_validation_error"}]}
 \`\`\`
