@@ -2,6 +2,7 @@ import { Command, Errors, Flags } from '@oclif/core';
 import { resolve, relative } from 'node:path';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { logger, colors, printNitrogenBanner, printGradientBar, printStep } from '@cloudcart/cli-kit';
 import { resolveProjectRoot, validateProject, readProjectConfig, loadEnvFile, exec } from '../../lib/project.js';
 
@@ -13,6 +14,24 @@ interface AssetEntry {
   hash: string;
   size: number;
   contentType: string;
+}
+
+/**
+ * The project's last commit, its message and its branch, for the deployment's record. None before the first
+ * commit, outside a repository or without git; git's own errors stay off the screen (B-486).
+ */
+function gitMetadata(root: string): Record<string, string> {
+  const git = (...args: string[]) =>
+    execFileSync('git', args, { cwd: root, encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  try {
+    return {
+      commit_sha: git('rev-parse', '--short', 'HEAD'),
+      commit_message: git('log', '-1', '--pretty=%s'),
+      branch: git('branch', '--show-current'),
+    };
+  } catch {
+    return {};
+  }
 }
 
 export default class NitrogenDeploy extends Command {
@@ -177,15 +196,7 @@ export default class NitrogenDeploy extends Command {
       formData.append('environment', environment);
       formData.append('assets_jwt', assetsJwt);
 
-      // Add git metadata if available
-      try {
-        const { execSync } = await import('node:child_process');
-        formData.append('commit_sha', execSync('git rev-parse --short HEAD', { cwd: root, encoding: 'utf-8' }).trim());
-        formData.append('commit_message', execSync('git log -1 --pretty=%s', { cwd: root, encoding: 'utf-8' }).trim());
-        formData.append('branch', execSync('git branch --show-current', { cwd: root, encoding: 'utf-8' }).trim());
-      } catch {
-        // Not a git repo, skip metadata
-      }
+      for (const [name, value] of Object.entries(gitMetadata(root))) formData.append(name, value);
 
       const response = await fetch(`${apiBase}/deploy`, {
         method: 'POST',

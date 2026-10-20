@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { exec } from '../../lib/project.js';
 import NitrogenDeploy from './deploy.js';
@@ -138,5 +139,36 @@ describe('nitrogen deploy', () => {
 
     expect(output.filter((line) => line.includes('Deploy failed: Worker too large'))).toHaveLength(1);
     expect(output.join('\n')).not.toContain('EEXIT');
+  });
+});
+
+describe('nitrogen deploy, the commit it records (B-486)', () => {
+  const git = (root: string, ...args: string[]) =>
+    execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid', '-c', 'commit.gpgsign=false', ...args], {
+      cwd: root,
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+
+  /** Deploys `root` and returns the git fields of the form the store got. */
+  async function recorded(root: string) {
+    answers = [json({ data: { account_id: 'acct', upload_jwt: uploadJwt, buckets: [] } }), json({ data: { status: 'live' } })];
+    await deploy('--path', root, '--no-build', '--token', deployToken);
+    const form = sent.at(-1)!.body as FormData;
+    return Object.fromEntries(['commit_sha', 'commit_message', 'branch'].map((name) => [name, form.get(name)]));
+  }
+
+  it('sends none before the first commit, as `init` leaves a project', async () => {
+    const { root } = built();
+    git(root, 'init', '-b', 'main');
+    expect(await recorded(root)).toEqual({ commit_sha: null, commit_message: null, branch: null });
+  });
+
+  it('sends the commit, its message and the branch', async () => {
+    const { root } = built();
+    git(root, 'init', '-b', 'main');
+    git(root, 'add', 'package.json');
+    git(root, 'commit', '-m', 'First page');
+    expect(await recorded(root)).toEqual({ commit_sha: git(root, 'rev-parse', '--short', 'HEAD'), commit_message: 'First page', branch: 'main' });
   });
 });
