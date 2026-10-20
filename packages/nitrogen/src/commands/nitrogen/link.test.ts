@@ -16,6 +16,7 @@ const storefront = {
   storefrontScopes: [],
 };
 let found: typeof storefront | null = storefront;
+let refused: Array<{ message: string }> | undefined;
 const queries: string[] = [];
 
 vi.mock('@cloudcart/cli-kit', async (importOriginal) => ({
@@ -27,7 +28,7 @@ vi.mock('@cloudcart/cli-kit', async (importOriginal) => ({
       const name = /query (\w+)/.exec(query)?.[1] ?? '';
       queries.push(name);
       return name === 'FindStorefront'
-        ? { data: { nitrogenStorefrontByName: found } }
+        ? { data: { nitrogenStorefrontByName: refused ? null : found }, errors: refused }
         : { data: { nitrogenStorefronts: { edges: [{ node: { id: 'gid-1', name: 'Main', handle: 'main', novaHostname: null } }] } } };
     },
   }),
@@ -39,6 +40,7 @@ let output: string[] = [];
 beforeEach(() => {
   output = [];
   found = storefront;
+  refused = undefined;
   queries.length = 0;
   for (const method of ['log', 'error', 'warn'] as const) {
     vi.spyOn(console, method).mockImplementation((...args: unknown[]) => void output.push(args.join(' ')));
@@ -83,6 +85,16 @@ describe('nitrogen link', () => {
     expect(queries).toEqual(['FindStorefront', 'ListStorefronts']);
     expect(output.join('\n')).toContain('Storefront "Missing" not found on shop.example.com.');
     expect(output.join('\n')).toContain('Main');
+  });
+
+  it("says what the store said when it refused the request, not that the storefront is missing (B-505)", async () => {
+    refused = [{ message: 'This action is unauthorized.' }];
+    const root = project();
+    await expect(link('--path', root, '--storefront', 'Main')).rejects.toMatchObject({ oclif: { exit: 1 } });
+
+    expect(queries).toEqual(['FindStorefront']);
+    expect(output.join('\n')).toContain('shop.example.com refused the request: This action is unauthorized.');
+    expect(output.join('\n')).not.toContain('not found');
   });
 
   it('keeps an existing link without --force, and asks nothing', async () => {

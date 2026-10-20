@@ -119,6 +119,9 @@ export default class AppExecute extends Command {
           console.log(formatJson(result.data));
         }
       }
+
+      // An answer with errors is a failed query, whatever data came with it (B-505).
+      if (result.errors?.length) this.exit(ExitCode.GENERAL);
     } catch (error) {
       if (error instanceof Error && error.message.startsWith('EEXIT')) throw error;
       if (jsonMode) {

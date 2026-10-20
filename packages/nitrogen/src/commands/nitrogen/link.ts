@@ -101,6 +101,12 @@ export default class NitrogenLink extends Command {
 
     const result = await gql.query<FindStorefrontResponse>(FIND_STOREFRONT_QUERY, { name: storefrontName });
 
+    // A refused request is not a missing storefront: say what the store said (B-505).
+    if (!result.data?.nitrogenStorefrontByName && result.errors?.length) {
+      logger.error(`${session.storeUrl} refused the request: ${result.errors.map((error) => error.message).join('; ')}`);
+      this.exit(1);
+    }
+
     if (!result.data?.nitrogenStorefrontByName) {
       logger.error(`Storefront "${storefrontName}" not found on ${session.storeUrl}.`);
       logger.info('Available storefronts:');

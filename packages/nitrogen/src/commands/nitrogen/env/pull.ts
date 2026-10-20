@@ -111,6 +111,14 @@ export default class NitrogenEnvPull extends Command {
     const result = await gql.query<StorefrontEnvResponse>(STOREFRONT_ENV_QUERY, { id: storefrontId });
     const storefront = result.data?.nitrogenStorefront;
 
+    // A refused request is not a missing storefront: say what the store said (B-505). A refused private token alone
+    // is answered below, with the rest of the variables.
+    const refusals = result.errors?.filter((error) => error.path?.[0] !== 'nitrogenStorefrontPrivateToken') ?? [];
+    if (!storefront && refusals.length) {
+      logger.error(`${storeName} refused the request: ${refusals.map((error) => error.message).join('; ')}`);
+      this.exit(1);
+    }
+
     if (!storefront) {
       logger.error('Storefront not found. It may have been deleted. Run `cloudcart nitrogen link --force` again.');
       this.exit(1);

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createGraphQLClient, getSession } from '@cloudcart/cli-kit';
 import AppExecute from './execute.js';
 
 // Mock @cloudcart/cli-kit
@@ -64,3 +65,34 @@ describe('AppExecute', () => {
     expect(fileFlag.exclusive).toContain('query');
   });
 });
+
+describe('app execute, the exit code (B-505)', () => {
+  const config = { runHook: async () => ({ successes: [], failures: [] }) };
+  // The describe above restores every mock before each of its tests, so the session is set here again.
+  const answer = (result: unknown) => {
+    vi.mocked(getSession).mockResolvedValue({ storeUrl: 'https://test.cloudcart.com' } as never);
+    vi.mocked(createGraphQLClient).mockReturnValue({ query: vi.fn().mockResolvedValue(result) } as never);
+  };
+  async function exitCode(...argv: string[]): Promise<number> {
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      await new AppExecute(argv, config as never).run();
+      return 0;
+    } catch (error) {
+      return (error as { oclif?: { exit?: number } }).oclif?.exit ?? -1;
+    }
+  }
+
+  it('is 0 for an answer without errors', async () => {
+    answer({ data: { shop: { name: 'Test' } } });
+    expect(await exitCode('--query', '{ shop { name } }')).toBe(0);
+    expect(await exitCode('--query', '{ shop { name } }', '--json')).toBe(0);
+  });
+
+  it('is 1 for an answer with errors, as text or JSON', async () => {
+    answer({ errors: [{ message: 'Cannot query field "nme" on type "Shop".' }] });
+    expect(await exitCode('--query', '{ shop { nme } }')).toBe(1);
+    expect(await exitCode('--query', '{ shop { nme } }', '--json')).toBe(1);
+  });
+});
+

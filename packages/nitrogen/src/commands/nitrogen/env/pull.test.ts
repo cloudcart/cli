@@ -4,12 +4,15 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadEnvFile } from '../../../lib/project.js';
 
+/** What the store answers instead of the storefront below, when a test sets it. */
+let refusal: unknown;
+
 vi.mock('@cloudcart/cli-kit', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@cloudcart/cli-kit')>()),
   printBanner: () => {},
   getSession: async () => ({}),
   createGraphQLClient: () => ({
-    query: async () => ({
+    query: async () => refusal ?? ({
       data: {
         nitrogenStorefront: {
           id: 'storefront-1',
@@ -32,6 +35,7 @@ const folders: string[] = [];
 afterEach(() => {
   for (const path of folders.splice(0)) rmSync(path, { recursive: true, force: true });
   vi.restoreAllMocks();
+  refusal = undefined;
 });
 
 /** A linked project whose `.env` holds the given session secret. */
@@ -74,3 +78,22 @@ describe('env pull and the session secret (B-461)', () => {
     expect(output).not.toContain('was shorter');
   });
 });
+
+describe('env pull when the store refuses (B-505)', () => {
+  it("says what the store said, not that the storefront was deleted", async () => {
+    refusal = {
+      data: { nitrogenStorefront: null, nitrogenStorefrontPrivateToken: null },
+      errors: [
+        { message: 'This action is unauthorized.', path: ['nitrogenStorefront'] },
+        { message: 'This action is unauthorized.', path: ['nitrogenStorefrontPrivateToken'] },
+      ],
+    };
+    const root = linkedProject('s'.repeat(64));
+    await expect(pull(root)).rejects.toMatchObject({ oclif: { exit: 1 } });
+    const said = vi.mocked(console.error).mock.calls.flat().join('\n');
+
+    expect(said).toContain('shop.example.com refused the request: This action is unauthorized.');
+    expect(said).not.toContain('deleted');
+  });
+});
+
