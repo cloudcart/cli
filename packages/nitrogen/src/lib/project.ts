@@ -79,8 +79,10 @@ export function exec(
       stdio: 'inherit',
       env: { ...process.env, ...extraEnv },
     });
-    child.on('close', (code) => {
-      if (code === 0 || code === null) resolve();
+    child.on('close', (code, signal) => {
+      if (code === 0) resolve();
+      // A process ended by a signal has no exit code: it did not finish its work (B-502).
+      else if (signal) reject(new Error(`Process ended by signal ${signal}`));
       else reject(new Error(`Process exited with code ${code}`));
     });
     child.on('error', (error) => reject(new Error(`Could not run ${command}: ${error.message}`)));

@@ -49,4 +49,8 @@ describe('exec (B-463)', () => {
     await expect(exec(process.execPath, ['-e', 'process.exit(3)'], folder())).rejects.toThrow('Process exited with code 3');
     await expect(exec('t506-no-such-program', [], folder())).rejects.toThrow(/Could not run t506-no-such-program: .*ENOENT/);
   });
+
+  it('fails when the process was ended by a signal: a killed build is not a finished one (B-502)', async () => {
+    await expect(exec(process.execPath, ['-e', 'process.kill(process.pid, "SIGKILL")'], folder())).rejects.toThrow('Process ended by signal SIGKILL');
+  });
 });
