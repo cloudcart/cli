@@ -34,6 +34,32 @@ function gitMetadata(root: string): Record<string, string> {
   }
 }
 
+/** How long `deploy` waits for a first deploy's address, and how often it asks. */
+const LIVE_WAIT_MS = 3 * 60_000;
+const LIVE_POLL_MS = 5_000;
+
+/** The page the hosting shows on an address with no deployment yet; the platform judges an address by it too. */
+const PLACEHOLDER = 'Deploy your project to go live';
+
+/** The linked storefront's Deployments tab in the admin, where its deployment tokens are made. */
+function adminPage(config: Record<string, unknown>): string | undefined {
+  return config.store && config.storefrontId ? `https://${config.store}/admin/nitrogen/${config.storefrontId}/nova` : undefined;
+}
+
+/** Whether `url` answers with the storefront before `deadline`: anything but the placeholder, as the platform counts it. */
+async function answers(url: string, deadline: number): Promise<boolean> {
+  for (;;) {
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+      if (!(await response.text()).includes(PLACEHOLDER)) return true;
+    } catch {
+      // No address or certificate yet.
+    }
+    if (Date.now() + LIVE_POLL_MS > deadline) return false;
+    await new Promise((resolve) => setTimeout(resolve, LIVE_POLL_MS));
+  }
+}
+
 export default class NitrogenDeploy extends Command {
   static override description = 'Deploy a Nitrogen storefront to Nova (CloudCart Edge Hosting)';
 
@@ -46,7 +72,11 @@ export default class NitrogenDeploy extends Command {
   static override flags = {
     path: Flags.string({ description: 'Path to the Nitrogen storefront root', default: '.' }),
     'env-file': Flags.string({ description: 'Path to .env file', default: '.env' }),
-    token: Flags.string({ char: 't', description: 'Nova deploy token (or set CLOUDCART_NOVA_TOKEN env var)' }),
+    token: Flags.string({
+      char: 't',
+      description:
+        "Deployment token, made in the admin on the storefront's Deployments tab, under Deployment tokens (or set CLOUDCART_NOVA_TOKEN)",
+    }),
     preview: Flags.boolean({ description: 'Deploy as preview (not production)', default: false }),
     'no-build': Flags.boolean({ description: 'Skip the build step', default: false }),
   };
@@ -76,8 +106,9 @@ export default class NitrogenDeploy extends Command {
       console.log(`    ${colors.bold('CLOUDCART_NOVA_TOKEN')} env var`);
       console.log(`    ${colors.dim('.cloudcart/project.json')} → novaToken field`);
       console.log();
-      console.log('  Get your token from the CloudCart admin panel:');
-      console.log('  Nitrogen > Storefronts > [Your Storefront] > Deploy Tokens');
+      console.log("  Make one in the CloudCart admin: the storefront's Deployments tab → Deployment tokens → Create token.");
+      console.log('  It is shown once; set it as CLOUDCART_NOVA_TOKEN in .env.');
+      console.log(`    ${colors.bold(adminPage(config) ?? 'https://<your store>/admin/nitrogen')}`);
       this.exit(1);
     }
 
@@ -237,6 +268,18 @@ export default class NitrogenDeploy extends Command {
 
       if (result.data?.status) {
         logger.info(`Status: ${result.data.status}`);
+      }
+
+      // The first deploy of an environment stays "deploying" until its address answers, which waits for the
+      // address's certificate (B-488).
+      if (result.data?.status === 'deploying' && deployedUrl) {
+        logger.info(`Waiting for ${deployedUrl} to answer, up to ${LIVE_WAIT_MS / 60_000} minutes...`);
+        if (await answers(deployedUrl, Date.now() + LIVE_WAIT_MS)) {
+          logger.success(`Live: ${colors.bold(deployedUrl)}`);
+        } else {
+          logger.warn(`${deployedUrl} does not answer yet. Open it in a few minutes, or follow the deployment in the admin:`);
+          console.log(`    ${colors.bold(adminPage(config) ?? `https://${storeDomain}/admin/nitrogen`)}`);
+        }
       }
     } catch (error) {
       // A step that failed has said why and exited: only an unexpected error is reported here (B-466).

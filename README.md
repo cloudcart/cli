@@ -154,6 +154,8 @@ cloudcart nitrogen deploy
 | `--no-git` | Skip `git init` |
 | `--no-install` | Skip the install |
 
+`deploy` needs the storefront's deployment token: make one in the CloudCart admin on the storefront's Deployments tab, under Deployment tokens → Create token (`https://<your store>/admin/nitrogen/<storefront id>/nova`; `deploy` prints the address of a linked project's), and set it as `CLOUDCART_NOVA_TOKEN` in `.env`. The token is shown once. The first deploy of an environment waits until its address answers, up to three minutes: a new address needs its certificate first.
+
 `dev --codegen` and `build --codegen` also generate the types of your `#graphql` queries (the project's `codegen.ts`) and React Router's route types; under `dev` the query types are made again whenever a query changes.
 
 ## Commands

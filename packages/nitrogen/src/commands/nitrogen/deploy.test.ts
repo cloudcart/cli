@@ -63,7 +63,7 @@ function built(): { root: string; assetHash: string } {
   mkdirSync(join(root, 'build/server'), { recursive: true });
   mkdirSync(join(root, 'build/client/assets'), { recursive: true });
   writeFileSync(join(root, 'package.json'), '{"name":"store"}\n');
-  writeFileSync(join(root, '.cloudcart/project.json'), JSON.stringify({ store: 'shop.example.com', storefrontId: 'gid-1' }));
+  writeFileSync(join(root, '.cloudcart/project.json'), JSON.stringify({ store: 'shop.example.com', storefrontId: '42' }));
   writeFileSync(join(root, 'build/server/index.js'), 'export default {};\n');
   const asset = 'console.log(1);\n';
   writeFileSync(join(root, 'build/client/assets/root-abc.js'), asset);
@@ -79,6 +79,18 @@ describe('nitrogen deploy', () => {
     await expect(deploy('--path', built().root, '--no-build')).rejects.toMatchObject({ oclif: { exit: 1 } });
     expect(output.join('\n')).toContain('No deploy token found.');
     expect(sent).toEqual([]);
+  });
+
+  it("names the admin page that makes a token: the linked storefront's, or the storefronts' list (B-488)", async () => {
+    const { root } = built();
+    await expect(deploy('--path', root, '--no-build')).rejects.toMatchObject({ oclif: { exit: 1 } });
+    expect(output.join('\n')).toContain("the storefront's Deployments tab → Deployment tokens → Create token");
+    expect(output.join('\n')).toContain('https://shop.example.com/admin/nitrogen/42/nova');
+
+    output = [];
+    rmSync(join(root, '.cloudcart'), { recursive: true });
+    await expect(deploy('--path', root, '--no-build')).rejects.toMatchObject({ oclif: { exit: 1 } });
+    expect(output.join('\n')).toContain('https://<your store>/admin/nitrogen');
   });
 
   it('opens an upload session, uploads the missing asset to Cloudflare, then deploys the worker', async () => {
@@ -170,5 +182,62 @@ describe('nitrogen deploy, the commit it records (B-486)', () => {
     git(root, 'add', 'package.json');
     git(root, 'commit', '-m', 'First page');
     expect(await recorded(root)).toEqual({ commit_sha: git(root, 'rev-parse', '--short', 'HEAD'), commit_message: 'First page', branch: 'main' });
+  });
+});
+
+describe('nitrogen deploy, a first deploy of an environment (B-488)', () => {
+  const address = 'https://main.nova.example';
+  const deploying = () => [
+    json({ data: { account_id: 'acct', upload_jwt: uploadJwt, buckets: [] } }),
+    json({ data: { deployed_url: address, id: 'dep-1', status: 'deploying' } }),
+  ];
+
+  beforeEach(() => vi.useFakeTimers({ toFake: ['setTimeout', 'Date'] }));
+  afterEach(() => vi.useRealTimers());
+
+  /** Runs a deploy while the clock moves on, a second at a time. */
+  async function deployWaiting(root: string) {
+    let done = false;
+    const run = deploy('--path', root, '--no-build', '--token', deployToken).finally(() => (done = true));
+    while (!done) {
+      await new Promise((resolve) => setImmediate(resolve));
+      await vi.advanceTimersByTimeAsync(1_000);
+    }
+    await run;
+  }
+
+  it('waits until the address answers with the storefront, then says it is live', async () => {
+    answers = [
+      ...deploying(),
+      () => {
+        throw new TypeError('fetch failed');
+      },
+      () => new Response('<p>Deploy your project to go live</p>'),
+      () => new Response('<html>The store</html>'),
+    ];
+    await deployWaiting(built().root);
+
+    expect(sent.slice(2).map(({ url }) => url)).toEqual([address, address, address]);
+    expect(output.join('\n')).toContain(`Live: ${address}`);
+    expect(output.join('\n')).not.toContain('does not answer yet');
+  });
+
+  it('stops waiting after three minutes and says where to follow the deployment', async () => {
+    answers = deploying();
+    const started = Date.now();
+    await deployWaiting(built().root);
+
+    expect(Date.now() - started).toBeLessThanOrEqual(3 * 60_000 + 1_000);
+    expect(sent.length).toBeGreaterThan(30);
+    expect(output.join('\n')).toContain(`${address} does not answer yet`);
+    expect(output.join('\n')).toContain('https://shop.example.com/admin/nitrogen/42/nova');
+    expect(output.join('\n')).not.toContain('Live:');
+  });
+
+  it('does not wait for a deploy that is live', async () => {
+    answers = [deploying()[0], json({ data: { deployed_url: address, id: 'dep-2', status: 'live' } })];
+    await deploy('--path', built().root, '--no-build', '--token', deployToken);
+    expect(sent).toHaveLength(2);
+    expect(output.join('\n')).not.toContain('Waiting for');
   });
 });
