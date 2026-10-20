@@ -18,6 +18,7 @@ export default class AuthLogin extends Command {
   static override examples = [
     '<%= config.bin %> auth login',
     '<%= config.bin %> auth login --store mystore.cloudcart.com',
+    '<%= config.bin %> auth login --store mystore.cloudcart.com --token cc_pat_xxx',
   ];
 
   static override flags = {
@@ -27,7 +28,7 @@ export default class AuthLogin extends Command {
     }),
     token: Flags.string({
       char: 't',
-      description: 'Personal Access Token',
+      description: 'Personal Access Token (cc_pat_…): signs in with it, asking nothing more when --store is given too',
     }),
   };
 
@@ -48,13 +49,15 @@ export default class AuthLogin extends Command {
 
     console.log();
 
-    // Step 2: Auth method
-    const method = await promptSelect('How would you like to authenticate?', [
-      'Browser login (recommended)',
-      'Personal Access Token (for CI/CD and scripts)',
-    ]);
-
-    console.log();
+    // Step 2: Auth method; a token given needs no question (B-487)
+    let method = 'Personal Access Token';
+    if (!flags.token) {
+      method = await promptSelect('How would you like to authenticate?', [
+        'Browser login (recommended)',
+        'Personal Access Token (for CI/CD and scripts)',
+      ]);
+      console.log();
+    }
 
     if (method.startsWith('Personal')) {
       const token =

@@ -177,6 +177,7 @@ cloudcart nitrogen deploy
 | `cloudcart nitrogen env push` | Set `.env`'s custom variables for one environment (`--env`, default `production`): shows the keys that change, asks first, deletes nothing; never sends the platform's variables or `SESSION_SECRET` |
 | `cloudcart nitrogen dev` | Start the development server |
 | `cloudcart nitrogen build` | Build the storefront for production |
+| `cloudcart nitrogen preview` | Serve the production build locally |
 | `cloudcart nitrogen deploy` | Deploy the storefront to Nova (CloudCart Edge Hosting) |
 | `cloudcart nitrogen generate route <name>` | Copy one of the starter's routes into the project (`product.$handle`, `category.$handle`, `cart`, …) |
 | `cloudcart nitrogen generate routes` | Copy the starter's routes the project does not have |
@@ -190,7 +191,7 @@ CloudCart CLI is designed to be operated by AI assistants as effectively as by h
 3. **Execute** — `cloudcart app execute --query '<query>' --json` returns structured, parseable output
 4. **Self-describe** — `cloudcart describe` and `cloudcart llms-context` give AI agents full operational context
 
-Every command supports `--json` for structured output and meaningful exit codes for error handling.
+The `app` commands take `--json` for structured output, and every command's exit code says how it ended: `cloudcart describe` lists the codes and every command the installed CLI has, the plugins' included.
 
 ## Architecture
 

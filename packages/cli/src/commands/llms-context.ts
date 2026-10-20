@@ -1,15 +1,18 @@
 import { Command } from '@oclif/core';
+import { EXIT_CODES, summary } from './describe.js';
 
 const CONTEXT = `# CloudCart CLI — AI Assistant Context
 
-> CLI tool for managing CloudCart e-commerce stores via the GraphQL Admin API.
-> This context helps AI assistants use the CLI effectively.
+> CLI tool for managing CloudCart e-commerce stores via the GraphQL Admin API, and for building and deploying
+> Nitrogen storefronts. This context helps AI assistants use the CLI effectively.
 
 ## Authentication
 
 Set these environment variables for non-interactive auth:
 - CLOUDCART_CLI_TOKEN: Your Personal Access Token (starts with cc_pat_) or JWT
 - CLOUDCART_CLI_STORE: Store URL (e.g., mystore.cloudcart.com)
+
+Or sign in once without a prompt: \`cloudcart auth login --store mystore.cloudcart.com --token cc_pat_xxx\`.
 
 ## Core Workflow
 
@@ -66,6 +69,30 @@ cloudcart app validate --query '{ products { edges { node { titl } } } }' --json
 cloudcart describe
 \`\`\`
 
+## Nitrogen storefronts
+
+A Nitrogen storefront is a React Router app on CloudCart's Storefront API, deployed to Nova (CloudCart Edge Hosting).
+The storefront is made in the CloudCart admin first; the commands work in the project's folder.
+
+1. \`cloudcart nitrogen init my-store\` — a new project from the CloudCart starter; asks for the store's domain (\`--package-manager\`, \`--no-install\`, \`--no-git\`)
+2. \`cloudcart auth login --store mystore.cloudcart.com --token cc_pat_xxx\` — \`link\` and \`env\` use the Admin API sign-in
+3. \`cloudcart nitrogen link --storefront <name>\` — links the project to the storefront (\`.cloudcart/project.json\`, no token in it)
+4. \`cloudcart nitrogen env pull\` — writes the storefront's variables, its API tokens among them, to \`.env\` (mode 600); asks before overwriting unless \`--force\`
+5. \`cloudcart nitrogen dev\` — the dev server on port 3000 (\`--port\`; \`--codegen\` keeps the \`#graphql\` query types current)
+6. \`cloudcart nitrogen build\` — the production build (\`--codegen\`); \`cloudcart nitrogen preview\` serves it locally
+7. \`cloudcart nitrogen deploy\` — builds and deploys to Nova (\`--preview\` for the preview environment, \`--no-build\`)
+
+Deploying needs the storefront's deployment token in \`CLOUDCART_NOVA_TOKEN\` (in \`.env\` or the environment) or \`--token\`: it is made in the
+admin on the storefront's Deployments tab, under Deployment tokens → Create token, and shown once. Without one, \`deploy\` prints the page's address.
+The first deploy of an environment waits until its address answers, up to three minutes.
+
+Also: \`nitrogen env list\` (the storefront's variables, secrets masked), \`nitrogen env push\` (the custom variables of \`.env\`; shows the
+changes and asks first; deletes nothing), \`nitrogen generate route <name>\` and \`nitrogen generate routes\` (the starter's routes back into
+the project; a route the project changed is kept unless \`--force\`).
+
+- **Never print \`.env\` values** — they are the storefront's tokens and secrets; name the keys only
+- **A deploy changes the live storefront** — run it when the developer asks for it
+
 ## Important Patterns
 
 - **Always use --json or --compact-output** for machine-readable output
@@ -101,7 +128,12 @@ Errors in --json mode include semantic types:
 
 Error types: auth_required, network_error (retryable), rate_limited (retryable), validation_error, file_not_found, graphql_validation_error, unexpected_error
 
-Exit codes: 0=success, 1=general, 2=usage, 3=not_found, 4=auth, 5=conflict, 6=rate_limited, 7=network
+Exit codes:
+${Object.entries(EXIT_CODES)
+  .map(([code, meaning]) => `- ${code}: ${meaning}`)
+  .join('\n')}
+
+4, 6 and 7 come from the \`app\` commands; the others exit 1 on any failure.
 
 ## GraphQL API Notes
 
@@ -130,6 +162,14 @@ export default class LlmsContext extends Command {
   static override flags = {};
 
   async run(): Promise<void> {
-    console.log(CONTEXT.trim());
+    // Every command the installed CLI has, the plugins' included, so the list cannot drift from the CLI (B-487).
+    const commands = this.config.commands
+      .filter((command) => !command.hidden)
+      .map((command) => {
+        const text = summary(command, this.config.bin);
+        return `- \`${this.config.bin} ${command.id.replaceAll(':', ' ')}\`${text ? ` — ${text}` : ''}`;
+      })
+      .sort();
+    console.log(`${CONTEXT.trim()}\n\n## All commands\n\n${commands.join('\n')}\n\nFlags and examples of each: \`${this.config.bin} describe\`.`);
   }
 }

@@ -13,21 +13,26 @@ const INTROSPECTION = introspectionFromSchema(
 /** Every document the command sent to the store. */
 let sent: string[] = [];
 
-vi.mock('@cloudcart/cli-kit', () => ({
-  getSession: vi.fn(async () => ({ storeUrl: 'shop.example.com' })),
-  createGraphQLClient: vi.fn(() => ({
-    query: async (document: string) => {
-      sent.push(document);
-      return document.includes('__schema') ? { data: INTROSPECTION } : { data: { productDelete: true } };
-    },
-  })),
-  logger: { info: vi.fn(), error: vi.fn(), success: vi.fn() },
-  toStructuredError: (err: unknown) => ({
-    type: 'unexpected_error',
-    message: err instanceof Error ? err.message : String(err),
-    retryable: false,
-  }),
-}));
+/** Set to make the store refuse every request. */
+let refusal: Error | undefined;
+
+vi.mock('@cloudcart/cli-kit', async () => {
+  // The errors and their exit codes are the real ones.
+  const { toStructuredError, ExitCode } = await vi.importActual<typeof import('@cloudcart/cli-kit')>('@cloudcart/cli-kit');
+  return {
+    getSession: vi.fn(async () => ({ storeUrl: 'shop.example.com' })),
+    createGraphQLClient: vi.fn(() => ({
+      query: async (document: string) => {
+        if (refusal) throw refusal;
+        sent.push(document);
+        return document.includes('__schema') ? { data: INTROSPECTION } : { data: { productDelete: true } };
+      },
+    })),
+    logger: { info: vi.fn(), error: vi.fn(), success: vi.fn() },
+    toStructuredError,
+    ExitCode,
+  };
+});
 
 const { default: AppValidate } = await import('./validate.js');
 
@@ -36,6 +41,7 @@ let output: string[] = [];
 beforeEach(() => {
   sent = [];
   output = [];
+  refusal = undefined;
   vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => void output.push(args.join(' ')));
 });
 
@@ -111,5 +117,23 @@ describe('AppValidate', () => {
   it('json flag defaults to false', () => {
     const jsonFlag = AppValidate.flags.json as { default?: boolean };
     expect(jsonFlag.default).toBe(false);
+  });
+});
+
+describe('app validate, the exit code (B-487)', () => {
+  it('is 4 when the store refuses the token, and 3 for a file it cannot read', async () => {
+    const { AuthenticationError } = await vi.importActual<typeof import('@cloudcart/cli-kit')>('@cloudcart/cli-kit');
+    refusal = new AuthenticationError('Invalid or expired token');
+    expect((await check('{ shop { name } }')).code).toBe(4);
+
+    refusal = undefined;
+    let code = 0;
+    try {
+      await new AppValidate(['--file', '/nonexistent/query.graphql', '--json'], config as never).run();
+    } catch (error) {
+      code = (error as { oclif?: { exit?: number } }).oclif?.exit ?? -1;
+    }
+    expect(code).toBe(3);
+    expect(JSON.parse(output.at(-1)!).errors[0].type).toBe('file_not_found');
   });
 });

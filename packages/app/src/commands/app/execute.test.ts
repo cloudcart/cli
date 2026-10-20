@@ -3,7 +3,9 @@ import { createGraphQLClient, getSession } from '@cloudcart/cli-kit';
 import AppExecute from './execute.js';
 
 // Mock @cloudcart/cli-kit
-vi.mock('@cloudcart/cli-kit', () => ({
+vi.mock('@cloudcart/cli-kit', async () => ({
+  // The errors and their exit codes are the real ones.
+  toStructuredError: (await vi.importActual<typeof import('@cloudcart/cli-kit')>('@cloudcart/cli-kit')).toStructuredError,
   getSession: vi.fn().mockResolvedValue({
     storeUrl: 'https://test.cloudcart.com',
     token: 'cc_pat_test',
@@ -21,11 +23,6 @@ vi.mock('@cloudcart/cli-kit', () => ({
     dim: (s: string) => s,
   },
   formatJson: (obj: unknown) => JSON.stringify(obj, null, 2),
-  toStructuredError: (err: unknown) => ({
-    type: 'unexpected_error',
-    message: err instanceof Error ? err.message : String(err),
-    retryable: false,
-  }),
   ExitCode: { SUCCESS: 0, GENERAL: 1, USAGE: 2, NOT_FOUND: 3, AUTH: 4, CONFLICT: 5, RATE_LIMITED: 6, NETWORK: 7 },
 }));
 
@@ -93,6 +90,23 @@ describe('app execute, the exit code (B-505)', () => {
     answer({ errors: [{ message: 'Cannot query field "nme" on type "Shop".' }] });
     expect(await exitCode('--query', '{ shop { nme } }')).toBe(1);
     expect(await exitCode('--query', '{ shop { nme } }', '--json')).toBe(1);
+  });
+
+  it("is the error's own: 4 for a refused token, 6 rate limited, 7 the network, 1 anything else (B-487)", async () => {
+    const { AuthenticationError, RateLimitError, NetworkError } = await vi.importActual<typeof import('@cloudcart/cli-kit')>('@cloudcart/cli-kit');
+    const failing = (error: Error) => {
+      vi.mocked(getSession).mockResolvedValue({ storeUrl: 'https://test.cloudcart.com' } as never);
+      vi.mocked(createGraphQLClient).mockReturnValue({ query: vi.fn().mockRejectedValue(error) } as never);
+    };
+    failing(new AuthenticationError('Invalid or expired token'));
+    expect(await exitCode('--query', '{ shop { name } }')).toBe(4);
+    expect(await exitCode('--query', '{ shop { name } }', '--json')).toBe(4);
+    failing(new RateLimitError());
+    expect(await exitCode('--query', '{ shop { name } }')).toBe(6);
+    failing(new NetworkError('getaddrinfo ENOTFOUND'));
+    expect(await exitCode('--query', '{ shop { name } }')).toBe(7);
+    failing(new Error('No credentials found'));
+    expect(await exitCode('--query', '{ shop { name } }')).toBe(1);
   });
 });
 

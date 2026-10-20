@@ -1,5 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { fileURLToPath } from 'node:url';
+import { Config } from '@oclif/core';
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import LlmsContext from './llms-context.js';
+
+// The CLI as installed: its own commands and its plugins' (read from the packages' builds).
+let config: Config;
+beforeAll(async () => {
+  config = await Config.load({ root: fileURLToPath(new URL('../..', import.meta.url)) });
+});
 
 describe('LlmsContext command', () => {
   beforeEach(() => {
@@ -14,7 +22,7 @@ describe('LlmsContext command', () => {
     const logs: string[] = [];
     vi.spyOn(console, 'log').mockImplementation((msg: string) => { logs.push(msg); });
 
-    const cmd = new LlmsContext([], {} as never);
+    const cmd = new LlmsContext([], config);
     await cmd.run();
 
     const output = logs.join('\n');
@@ -28,7 +36,7 @@ describe('LlmsContext command', () => {
     const logs: string[] = [];
     vi.spyOn(console, 'log').mockImplementation((msg: string) => { logs.push(msg); });
 
-    const cmd = new LlmsContext([], {} as never);
+    const cmd = new LlmsContext([], config);
     await cmd.run();
 
     const output = logs.join('\n');
@@ -40,7 +48,7 @@ describe('LlmsContext command', () => {
     const logs: string[] = [];
     vi.spyOn(console, 'log').mockImplementation((msg: string) => { logs.push(msg); });
 
-    const cmd = new LlmsContext([], {} as never);
+    const cmd = new LlmsContext([], config);
     await cmd.run();
 
     const output = logs.join('\n');
@@ -53,7 +61,7 @@ describe('LlmsContext command', () => {
     const logs: string[] = [];
     vi.spyOn(console, 'log').mockImplementation((msg: string) => { logs.push(msg); });
 
-    const cmd = new LlmsContext([], {} as never);
+    const cmd = new LlmsContext([], config);
     await cmd.run();
 
     const output = logs.join('\n');
@@ -65,11 +73,38 @@ describe('LlmsContext command', () => {
     const logs: string[] = [];
     vi.spyOn(console, 'log').mockImplementation((msg: string) => { logs.push(msg); });
 
-    const cmd = new LlmsContext([], {} as never);
+    const cmd = new LlmsContext([], config);
     await cmd.run();
 
     const output = logs.join('\n');
     expect(output).toContain('YesNo');
     expect(output).toContain('pagination');
+  });
+
+  it('documents the Nitrogen workflow and the deployment token (B-487)', async () => {
+    const logs: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((msg: string) => { logs.push(msg); });
+
+    await new LlmsContext([], config).run();
+
+    const output = logs.join('\n');
+    for (const command of ['nitrogen init', 'nitrogen link', 'nitrogen env pull', 'nitrogen dev', 'nitrogen build', 'nitrogen deploy']) {
+      expect(output).toContain(`cloudcart ${command}`);
+    }
+    expect(output).toContain('CLOUDCART_NOVA_TOKEN');
+    expect(output).toContain('Deployment tokens');
+    expect(output).not.toContain('5=conflict');
+  });
+
+  it('lists every command the CLI has (B-487)', async () => {
+    const logs: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((msg: string) => { logs.push(msg); });
+
+    await new LlmsContext([], config).run();
+
+    const listed = logs.join('\n').split('## All commands')[1];
+    for (const command of config.commands.filter((c) => !c.hidden)) {
+      expect(listed).toContain(`\`cloudcart ${command.id.replaceAll(':', ' ')}\``);
+    }
   });
 });

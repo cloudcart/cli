@@ -131,7 +131,8 @@ export default class AppExecute extends Command {
       } else if (error instanceof Error) {
         logger.error(error.message);
       }
-      this.exit(1);
+      // The error's class names the exit code: 4 a refused token, 6 rate limited, 7 the network (B-487).
+      this.exit(toStructuredError(error).exitCode);
     }
   }
 

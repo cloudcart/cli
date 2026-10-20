@@ -6,6 +6,7 @@ import {
   createGraphQLClient,
   logger,
   toStructuredError,
+  ExitCode,
 } from '@cloudcart/cli-kit';
 import { INTROSPECTION_QUERY } from '../../lib/admin-schema.js';
 
@@ -56,7 +57,7 @@ export default class AppValidate extends Command {
         query = await readFile(flags.file, 'utf-8');
       } catch {
         this.outputResult(jsonMode, false, [{ message: `Could not read file: ${flags.file}`, type: 'file_not_found' }]);
-        this.exit(2);
+        this.exit(ExitCode.NOT_FOUND);
       }
     } else if (!process.stdin.isTTY) {
       query = await this.readStdin();
@@ -114,7 +115,8 @@ export default class AppValidate extends Command {
       } else if (error instanceof Error) {
         logger.error(error.message);
       }
-      this.exit(1);
+      // The error's class names the exit code: 4 a refused token, 6 rate limited, 7 the network (B-487).
+      this.exit(toStructuredError(error).exitCode);
     }
   }
 
