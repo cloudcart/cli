@@ -1,7 +1,14 @@
-import { describe, it, expect, vi } from 'vitest';
+import { rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { buildSchema, introspectionFromSchema } from 'graphql';
+import { afterAll, describe, it, expect, vi } from 'vitest';
+import { createGraphQLClient, getSession, CONFIG_DIR } from '@cloudcart/cli-kit';
 import AppSchema from './schema.js';
 
-vi.mock('@cloudcart/cli-kit', () => ({
+vi.mock('@cloudcart/cli-kit', async () => ({
+  // The CLI's folder is a fresh one.
+  CLIError: (await vi.importActual<typeof import('@cloudcart/cli-kit')>('@cloudcart/cli-kit')).CLIError,
+  CONFIG_DIR: (await import('node:fs')).mkdtempSync(join((await import('node:os')).tmpdir(), 'cc-schema-cmd-')),
   getSession: vi.fn(),
   createGraphQLClient: vi.fn(),
   logger: { info: vi.fn(), error: vi.fn(), success: vi.fn() },
@@ -225,5 +232,23 @@ describe('AppSchema', () => {
     expect(instance.format({ ...flags, output: 'schema.graphql', compact: true })).toBe('compact');
     // A filtered schema cannot be printed as SDL: it lacks the types its fields point to.
     expect(instance.format({ ...flags, output: 'schema.graphql', search: 'product' })).toBe('compact');
+  });
+});
+
+describe('app schema, the kept schema (B-550)', () => {
+  const config = { runHook: async () => ({ successes: [], failures: [] }) };
+  afterAll(() => rmSync(CONFIG_DIR, { recursive: true, force: true }));
+
+  it('reads the store once for two searches, and again with --refresh', async () => {
+    const query = vi.fn(async () => ({ data: introspectionFromSchema(buildSchema('type Query { products: [String] }')) }));
+    vi.mocked(getSession).mockResolvedValue({ storeUrl: 'shop.example.com' } as never);
+    vi.mocked(createGraphQLClient).mockReturnValue({ query } as never);
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await new AppSchema(['--search', 'product', '--compact'], config as never).run();
+    await new AppSchema(['--search', 'product', '--compact'], config as never).run();
+    expect(query).toHaveBeenCalledTimes(1);
+    await new AppSchema(['--search', 'product', '--compact', '--refresh'], config as never).run();
+    expect(query).toHaveBeenCalledTimes(2);
   });
 });

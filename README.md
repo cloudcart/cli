@@ -92,7 +92,13 @@ cloudcart app execute --file query.graphql --variables vars.json --json
 
 # Pipe from stdin
 echo '{ shop { name } }' | cloudcart app execute --compact-output
+
+# Wait longer for a heavy query (seconds, 1–600; the default is 60)
+cloudcart app execute --file export.graphql --timeout 180 --json
 ```
+
+The store checks every document against its schema before it runs it and refuses an invalid one without running any of it. A mutation
+that timed out or failed with 502, 503 or 504 may still have run: its error says `retryable: false`.
 
 ### Explore the API schema
 
@@ -109,10 +115,12 @@ cloudcart app schema --queries-only --compact
 cloudcart app schema --compact
 ```
 
-### Validate before executing
+The schema is kept in `~/.cloudcart/schema/` for an hour, so a search does not download it again; `--refresh` reads it from the store.
+
+### Validate without running
 
 ```bash
-# Catch field name typos before they hit the API
+# Check a document that is not run now (a mutation to confirm first, a query written into code); nothing is sent to the store
 cloudcart app validate --query '{ products { edges { node { titl } } } }' --json
 # => {"valid": false, "errors": [{"message": "Cannot query field 'titl'..."}]}
 ```
@@ -187,8 +195,8 @@ cloudcart nitrogen deploy
 CloudCart CLI is designed to be operated by AI assistants as effectively as by humans:
 
 1. **Discover** — `cloudcart app schema --search <topic> --compact` finds relevant types without loading the full schema
-2. **Validate** — `cloudcart app validate --query '<query>' --json` catches errors before execution
-3. **Execute** — `cloudcart app execute --query '<query>' --json` returns structured, parseable output
+2. **Execute** — `cloudcart app execute --query '<query>' --json` returns structured, parseable output; the store refuses an invalid document before running it
+3. **Validate** — `cloudcart app validate --query '<query>' --json` checks a document that is not run now, without sending it
 4. **Self-describe** — `cloudcart describe` and `cloudcart llms-context` give AI agents full operational context
 
 The `app` commands take `--json` for structured output, and every command's exit code says how it ended: `cloudcart describe` lists the codes and every command the installed CLI has, the plugins' included.

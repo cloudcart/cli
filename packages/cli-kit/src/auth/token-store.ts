@@ -19,7 +19,8 @@ export interface CLIConfig {
   stores: Record<string, StoreCredentials>;
 }
 
-const CONFIG_DIR = join(homedir(), '.cloudcart');
+/** The CLI's own folder: the sign-ins' `config.json`, and the stores' schemas `app schema` and `app validate` keep. */
+export const CONFIG_DIR = join(homedir(), '.cloudcart');
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json');
 
 export async function loadConfig(): Promise<CLIConfig> {

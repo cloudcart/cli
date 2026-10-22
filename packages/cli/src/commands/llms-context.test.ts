@@ -44,6 +44,21 @@ describe('LlmsContext command', () => {
     expect(output).toContain('CLOUDCART_CLI_STORE');
   });
 
+  it('tells assistants to execute without validating first, and what a failed mutation means (B-549, B-550)', async () => {
+    const logs: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((msg: string) => { logs.push(msg); });
+
+    await new LlmsContext([], config).run();
+
+    const output = logs.join('\n');
+    expect(output).not.toMatch(/Validate before|Validate your query/);
+    expect(output).toContain('refuses an invalid one without running any of it');
+    expect(output).toContain('--refresh');
+    expect(output).toContain('--timeout');
+    expect(output).toMatch(/timeout and server_unavailable[^.]*never for a mutation/);
+    expect(output).toContain('retryAfterSeconds');
+  });
+
   it('documents the discover-validate-execute workflow', async () => {
     const logs: string[] = [];
     vi.spyOn(console, 'log').mockImplementation((msg: string) => { logs.push(msg); });

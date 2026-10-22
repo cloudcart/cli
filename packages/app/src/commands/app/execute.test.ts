@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createGraphQLClient, getSession } from '@cloudcart/cli-kit';
-import AppExecute from './execute.js';
+import AppExecute, { hasMutation } from './execute.js';
 
 // Mock @cloudcart/cli-kit
 vi.mock('@cloudcart/cli-kit', async () => ({
@@ -110,3 +110,42 @@ describe('app execute, the exit code (B-505)', () => {
   });
 });
 
+describe('app execute, a mutation and the wait (B-548, B-549)', () => {
+  const config = { runHook: async () => ({ successes: [], failures: [] }) };
+  let client: { query: ReturnType<typeof vi.fn>; mutation: ReturnType<typeof vi.fn> };
+
+  beforeEach(() => {
+    client = { query: vi.fn().mockResolvedValue({ data: {} }), mutation: vi.fn().mockResolvedValue({ data: {} }) };
+    vi.mocked(getSession).mockResolvedValue({ storeUrl: 'https://test.cloudcart.com' } as never);
+    vi.mocked(createGraphQLClient).mockReturnValue(client as never);
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  const run = (...argv: string[]) => new AppExecute(argv, config as never).run();
+
+  it('sends a document with a mutation through mutation(), any other through query()', async () => {
+    await run('--query', 'mutation { productDelete(id: 1) }', '--json');
+    await run('--query', 'query A { products { id } } mutation B { productDelete(id: 1) }', '--json');
+    expect(client.mutation).toHaveBeenCalledTimes(2);
+    expect(client.query).not.toHaveBeenCalled();
+
+    await run('--query', '{ products { id } }', '--json');
+    expect(client.query).toHaveBeenCalledTimes(1);
+  });
+
+  it('finds a mutation by parsing, not by the word', () => {
+    expect(hasMutation('# mutation\n{ products { id } }')).toBe(false);
+    expect(hasMutation('{ mutationLog { id } }')).toBe(false);
+    expect(hasMutation('  mutation Delete { productDelete(id: 1) }')).toBe(true);
+    expect(hasMutation('mutation {')).toBe(false);
+  });
+
+  it('waits --timeout seconds, the default when not given, and refuses a wait outside 1–600', async () => {
+    await run('--query', '{ products { id } }', '--timeout', '5', '--json');
+    expect(vi.mocked(createGraphQLClient).mock.lastCall?.[1]).toEqual({ timeoutMs: 5000 });
+    await run('--query', '{ products { id } }', '--json');
+    expect(vi.mocked(createGraphQLClient).mock.lastCall?.[1]).toEqual({ timeoutMs: undefined });
+    await expect(run('--query', '{ products { id } }', '--timeout', '0')).rejects.toThrow(/greater than or equal to 1/);
+    await expect(run('--query', '{ products { id } }', '--timeout', '601')).rejects.toThrow(/less than or equal to 600/);
+  });
+});

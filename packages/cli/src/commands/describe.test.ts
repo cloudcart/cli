@@ -16,7 +16,7 @@ interface Described {
   commands: Record<string, { flags?: Record<string, unknown>; args?: Record<string, unknown>; token?: string }>;
   auth: { env_vars: Record<string, string> };
   exit_codes: Record<string, string>;
-  ai_usage: { recommended_flags: string[]; schema_discovery: string; nitrogen_workflow: string[] };
+  ai_usage: { recommended_flags: string[]; schema_discovery: string; validate_without_running: string; nitrogen_workflow: string[] };
 }
 
 async function described(): Promise<Described> {
@@ -101,5 +101,9 @@ describe('Describe command', () => {
     expect(parsed.ai_usage.recommended_flags).toContain('--json');
     expect(parsed.ai_usage.schema_discovery).toContain('--search');
     expect(parsed.ai_usage.nitrogen_workflow.at(-1)).toBe('cloudcart nitrogen deploy');
+    // An execute needs no validation first: the store refuses an invalid document before running it (B-550).
+    expect(parsed.ai_usage).not.toHaveProperty('validate_before_execute');
+    expect(parsed.ai_usage.validate_without_running).toContain('app validate');
+    expect(parsed.exit_codes[7]).toContain('unless the document was a mutation');
   });
 });

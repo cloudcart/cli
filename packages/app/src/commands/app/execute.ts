@@ -1,5 +1,6 @@
 import { Command, Flags } from '@oclif/core';
 import { readFile } from 'node:fs/promises';
+import { Kind, parse } from 'graphql';
 import {
   getSession,
   createGraphQLClient,
@@ -48,6 +49,11 @@ export default class AppExecute extends Command {
       description: 'Minified JSON output (no whitespace, saves tokens)',
       default: false,
     }),
+    timeout: Flags.integer({
+      description: "Seconds to wait for the store's answer (default 60)",
+      min: 1,
+      max: 600,
+    }),
   };
 
   async run(): Promise<void> {
@@ -94,13 +100,16 @@ export default class AppExecute extends Command {
 
     try {
       const session = await getSession({ storeUrl: flags.store, autoPrompt: !jsonMode });
-      const client = createGraphQLClient(session);
+      const client = createGraphQLClient(session, { timeoutMs: flags.timeout && flags.timeout * 1000 });
 
       if (!jsonMode) {
         logger.info(colors.dim(`Executing against ${session.storeUrl}...`));
       }
 
-      const result = await client.query(query!, variables);
+      // A mutation's failure after it was sent is never called retryable: it may have run (B-549).
+      const result = hasMutation(query!)
+        ? await client.mutation(query!, variables)
+        : await client.query(query!, variables);
 
       if (jsonMode) {
         // Machine-readable: single JSON object with data and errors
@@ -152,5 +161,16 @@ export default class AppExecute extends Command {
       process.stdin.on('end', () => resolve(data));
       process.stdin.on('error', reject);
     });
+  }
+}
+
+/** Whether the document holds a mutation; one that does not parse holds none, since the store runs nothing of it. */
+export function hasMutation(document: string): boolean {
+  try {
+    return parse(document).definitions.some(
+      (definition) => definition.kind === Kind.OPERATION_DEFINITION && definition.operation === 'mutation',
+    );
+  } catch {
+    return false;
   }
 }

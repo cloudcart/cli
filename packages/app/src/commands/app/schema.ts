@@ -8,7 +8,7 @@ import {
   colors,
   toStructuredError,
 } from '@cloudcart/cli-kit';
-import { INTROSPECTION_QUERY } from '../../lib/admin-schema.js';
+import { readAdminSchema } from '../../lib/admin-schema.js';
 
 interface TypeRef {
   kind: string;
@@ -103,6 +103,10 @@ export default class AppSchema extends Command {
       description: 'Output raw JSON introspection (the default, except for a .graphql or .gql file)',
       default: false,
     }),
+    refresh: Flags.boolean({
+      description: 'Read the schema from the store again instead of the copy kept for an hour',
+      default: false,
+    }),
   };
 
   async run(): Promise<void> {
@@ -112,30 +116,20 @@ export default class AppSchema extends Command {
 
     try {
       const session = await getSession({ storeUrl: flags.store, autoPrompt: !quiet });
-      const client = createGraphQLClient(session);
+      const { introspection, fromCache, fetchedAt } = await readAdminSchema(
+        session.storeUrl,
+        createGraphQLClient(session),
+        { refresh: flags.refresh },
+      );
 
       if (!quiet) {
-        logger.info(colors.dim(`Fetching schema from ${session.storeUrl}...`));
+        const minutes = Math.floor((Date.now() - fetchedAt.getTime()) / 60_000);
+        logger.info(colors.dim(fromCache
+          ? `The schema of ${session.storeUrl} kept ${minutes} min ago (--refresh reads it again)`
+          : `Read the schema from ${session.storeUrl}`));
       }
 
-      const result = await client.query(INTROSPECTION_QUERY);
-
-      if (result.errors?.length) {
-        for (const e of result.errors) {
-          if (jsonMode) {
-            console.log(JSON.stringify({ data: null, errors: result.errors }));
-          } else {
-            logger.error(`GraphQL Error: ${e.message}`);
-          }
-        }
-        this.exit(1);
-      }
-
-      const schema = result.data?.__schema as SchemaData | undefined;
-      if (!schema) {
-        logger.error('No schema data returned. The store may not support introspection.');
-        this.exit(1);
-      }
+      const schema = introspection.__schema as unknown as SchemaData;
 
       // Apply filters
       let filteredSchema = schema;

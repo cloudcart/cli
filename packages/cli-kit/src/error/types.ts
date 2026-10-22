@@ -18,6 +18,8 @@ export interface StructuredError {
   message: string;
   retryable: boolean;
   hint?: string;
+  /** How long the store asked to wait before the next try (its `Retry-After`) */
+  retryAfterSeconds?: number;
   exitCode: ExitCodeValue;
 }
 
@@ -25,6 +27,7 @@ export class CLIError extends Error {
   public errorType: string;
   public retryable: boolean;
   public hint?: string;
+  public retryAfterSeconds?: number;
   public exitCode: ExitCodeValue;
 
   constructor(
@@ -33,6 +36,7 @@ export class CLIError extends Error {
       suggestion?: string;
       type?: string;
       retryable?: boolean;
+      retryAfterSeconds?: number;
       exitCode?: ExitCodeValue;
     },
   ) {
@@ -41,6 +45,7 @@ export class CLIError extends Error {
     this.errorType = options?.type ?? 'general_error';
     this.retryable = options?.retryable ?? false;
     this.hint = options?.suggestion;
+    this.retryAfterSeconds = options?.retryAfterSeconds;
     this.exitCode = options?.exitCode ?? ExitCode.GENERAL;
   }
 
@@ -55,8 +60,46 @@ export class CLIError extends Error {
       message: this.message,
       retryable: this.retryable,
       hint: this.hint,
+      ...(this.retryAfterSeconds === undefined
+        ? {}
+        : { retryAfterSeconds: this.retryAfterSeconds }),
       exitCode: this.exitCode,
     };
+  }
+}
+
+/**
+ * A mutation that failed by a timeout or a 502, 503 or 504 may have run on the store before the answer was lost,
+ * so it is never marked retryable: sending it again could do its work twice (B-549).
+ */
+export const MUTATION_MAY_HAVE_RUN =
+  'The mutation may have run before the answer was lost: read the record before sending it again.';
+
+export class TimeoutError extends CLIError {
+  constructor(seconds: number, options?: { mutation?: boolean }) {
+    super(`The store did not answer within ${seconds} s.`, {
+      suggestion: options?.mutation
+        ? MUTATION_MAY_HAVE_RUN
+        : 'Try again; `app execute --timeout <seconds>` waits longer for a heavy query.',
+      type: 'timeout',
+      retryable: !options?.mutation,
+      exitCode: ExitCode.NETWORK,
+    });
+    this.name = 'TimeoutError';
+  }
+}
+
+/** A 502, 503 or 504: the store, or what stands in front of it, could not answer for now. */
+export class ServerUnavailableError extends CLIError {
+  constructor(message: string, options?: { mutation?: boolean; retryAfterSeconds?: number }) {
+    super(message, {
+      suggestion: options?.mutation ? MUTATION_MAY_HAVE_RUN : 'Try again in a moment.',
+      type: 'server_unavailable',
+      retryable: !options?.mutation,
+      retryAfterSeconds: options?.retryAfterSeconds,
+      exitCode: ExitCode.NETWORK,
+    });
+    this.name = 'ServerUnavailableError';
   }
 }
 
@@ -96,11 +139,13 @@ export class NetworkError extends CLIError {
 }
 
 export class RateLimitError extends CLIError {
-  constructor(message = 'Rate limited. Try again in a few seconds.') {
-    super(message, {
-      suggestion: 'Wait a few seconds and retry.',
+  constructor(retryAfterSeconds?: number) {
+    const wait = retryAfterSeconds === undefined ? 'a few seconds' : `${retryAfterSeconds} s`;
+    super(`Rate limited. Try again in ${wait}.`, {
+      suggestion: `Wait ${wait} and retry.`,
       type: 'rate_limited',
       retryable: true,
+      retryAfterSeconds,
       exitCode: ExitCode.RATE_LIMITED,
     });
     this.name = 'RateLimitError';

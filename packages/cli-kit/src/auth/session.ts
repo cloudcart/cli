@@ -117,9 +117,10 @@ export function createAdminAPI(session: Session): AdminAPI {
   });
 }
 
-export function createGraphQLClient(session: Session): GraphQLClient {
+export function createGraphQLClient(session: Session, options?: { timeoutMs?: number }): GraphQLClient {
   return new GraphQLClient({
     storeUrl: `https://${session.storeUrl}`,
     token: session.credentials.token,
+    timeoutMs: options?.timeoutMs,
   });
 }

@@ -8,11 +8,13 @@ import {
   toStructuredError,
   ExitCode,
 } from '@cloudcart/cli-kit';
-import { INTROSPECTION_QUERY } from '../../lib/admin-schema.js';
+import { readAdminSchema, SchemaUnavailableError } from '../../lib/admin-schema.js';
 
 /**
  * Validates a GraphQL document against the store's Admin API schema without executing it: the schema is read by
- * introspection and the document is checked here, so a mutation is never sent to the store.
+ * introspection (or the copy kept for an hour) and the document is checked here, so a mutation is never sent to the
+ * store. A kept copy that finds errors is read again from the store before they are reported, so an old copy never
+ * calls a document invalid (B-550).
  */
 export default class AppValidate extends Command {
   static override description = 'Validate a GraphQL query against the Admin API schema, locally: the query is never sent to the store';
@@ -40,6 +42,10 @@ export default class AppValidate extends Command {
     }),
     json: Flags.boolean({
       description: 'Output validation result as JSON',
+      default: false,
+    }),
+    refresh: Flags.boolean({
+      description: 'Read the schema from the store again instead of the copy kept for an hour',
       default: false,
     }),
   };
@@ -85,20 +91,11 @@ export default class AppValidate extends Command {
       const client = createGraphQLClient(session);
 
       // Only the introspection goes to the store; the document is checked here.
-      const result = await client.query(INTROSPECTION_QUERY);
-      const introspection = result.data as IntrospectionQuery | undefined;
-
-      if (result.errors?.length || !introspection?.__schema) {
-        const message = result.errors?.map((e) => e.message).join('; ') || 'The store returned no schema.';
-        this.outputResult(jsonMode, false, [{ message: `Could not read the schema: ${message}`, type: 'schema_unavailable' }]);
-        this.exit(1);
+      const schema = await readAdminSchema(session.storeUrl, client, { refresh: flags.refresh });
+      let errors = check(schema.introspection, document!);
+      if (errors.length && schema.fromCache) {
+        errors = check((await readAdminSchema(session.storeUrl, client, { refresh: true })).introspection, document!);
       }
-
-      const errors = validate(buildClientSchema(introspection), document!).map((e) => ({
-        message: e.message,
-        type: 'graphql_validation_error' as const,
-        locations: e.locations,
-      }));
 
       if (errors.length) {
         this.outputResult(jsonMode, false, errors);
@@ -109,6 +106,10 @@ export default class AppValidate extends Command {
     } catch (error) {
       // oclif exit errors should propagate
       if (error instanceof Error && error.message.startsWith('EEXIT')) throw error;
+      if (error instanceof SchemaUnavailableError) {
+        this.outputResult(jsonMode, false, [{ message: error.message, type: 'schema_unavailable' }]);
+        this.exit(1);
+      }
       if (jsonMode) {
         const structured = toStructuredError(error);
         console.log(JSON.stringify({ valid: false, errors: [structured] }));
@@ -145,4 +146,13 @@ export default class AppValidate extends Command {
       process.stdin.on('error', reject);
     });
   }
+}
+
+/** The document's errors against the schema, as `--json` prints them. */
+function check(introspection: IntrospectionQuery, document: DocumentNode) {
+  return validate(buildClientSchema(introspection), document).map((e) => ({
+    message: e.message,
+    type: 'graphql_validation_error' as const,
+    locations: e.locations,
+  }));
 }

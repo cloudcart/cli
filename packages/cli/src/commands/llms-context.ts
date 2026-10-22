@@ -16,9 +16,11 @@ Or sign in once without a prompt: \`cloudcart auth login --store mystore.cloudca
 
 ## Core Workflow
 
-1. Discover the API: \`cloudcart app schema --search <topic> --compact\`
-2. Validate your query: \`cloudcart app validate --query '<query>' --json\`
-3. Execute: \`cloudcart app execute --query '<query>' --compact-output\`
+1. Discover the API: \`cloudcart app schema --search <topic> --compact\` (the schema is kept for an hour; \`--refresh\` reads it again)
+2. Execute: \`cloudcart app execute --query '<query>' --compact-output\` — the store checks every document against its schema
+   before it runs it and refuses an invalid one without running any of it, so there is no need to validate first
+3. Validate only a document that is not run now — a mutation shown for confirmation, a query written into code:
+   \`cloudcart app validate --query '<query>' --json\`
 
 ## Commands
 
@@ -35,6 +37,9 @@ cloudcart app execute --query 'mutation($input: CreateProductInput!) { createPro
 
 # From file
 cloudcart app execute --file query.graphql --json
+
+# A heavy query: wait up to 180 s instead of the default 60 (1–600)
+cloudcart app execute --file export.graphql --timeout 180 --json
 \`\`\`
 
 ### Explore Schema
@@ -58,7 +63,8 @@ cloudcart app schema --types-only
 
 ### Validate Queries
 \`\`\`bash
-# Checks against the store's schema locally: the document is never sent, so a mutation is safe to check
+# Checks against the store's schema locally: the document is never sent, so a mutation is safe to check.
+# The schema kept from the last hour is used; a document it finds invalid is checked again against a fresh one.
 cloudcart app validate --query '{ products { edges { node { titl } } } }' --json
 # Returns: {"valid":false,"errors":[{"message":"Cannot query field 'titl'...","type":"graphql_validation_error"}]}
 \`\`\`
@@ -97,7 +103,8 @@ the project; a route the project changed is kept unless \`--force\`).
 
 - **Always use --json or --compact-output** for machine-readable output
 - **Search schema before querying** — use \`--search\` to find relevant types instead of loading the full schema
-- **Validate before mutating** — use \`app validate\` to catch errors before executing mutations
+- **No validate before execute** — the store refuses an invalid document before running any of it; \`app validate\` is for a document not run now
+- **A mutation that timed out or failed with 502, 503 or 504 may have run** — its error says \`retryable: false\`: read the record before sending it again
 - **Pagination** — Every manual Connection type exposes BOTH shapes. Prefer \`nodes\` when you don't need cursors (half the payload):
   \`\`\`graphql
   # Flat (preferred for most queries)
@@ -126,7 +133,10 @@ Errors in --json mode include semantic types:
 }
 \`\`\`
 
-Error types: auth_required, network_error (retryable), rate_limited (retryable), validation_error, file_not_found, graphql_validation_error, unexpected_error
+Error types: auth_required, network_error (retryable), timeout and server_unavailable (a 502, 503 or 504; both retryable for a query,
+never for a mutation), rate_limited (retryable), http_error (any other refused answer, with the store's message), schema_unavailable,
+validation_error, file_not_found, graphql_validation_error, unexpected_error. When the store names a wait (\`Retry-After\`), the error
+carries it as \`retryAfterSeconds\`.
 
 Exit codes:
 ${Object.entries(EXIT_CODES)

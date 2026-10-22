@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GraphQLClient, GraphQLRequestError } from './graphql-client.js';
-import { AuthenticationError, NetworkError, RateLimitError } from '../error/types.js';
+import {
+  AuthenticationError,
+  MUTATION_MAY_HAVE_RUN,
+  NetworkError,
+  RateLimitError,
+  toStructuredError,
+} from '../error/types.js';
 
 describe('GraphQLClient', () => {
   const options = {
@@ -30,6 +36,7 @@ describe('GraphQLClient', () => {
         'X-API-Version': '2026-01',
       },
       body: JSON.stringify({ query: '{ __typename }', variables: undefined }),
+      signal: expect.any(AbortSignal),
     });
     expect(result).toEqual(mockResponse);
   });
@@ -71,22 +78,14 @@ describe('GraphQLClient', () => {
   });
 
   it('throws RateLimitError on 429', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: false,
-      status: 429,
-      statusText: 'Too Many Requests',
-    }));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 429, statusText: 'Too Many Requests' })));
 
     const client = new GraphQLClient(options);
     await expect(client.query('{ __typename }')).rejects.toThrow(RateLimitError);
   });
 
   it('throws GraphQLRequestError on other non-ok response', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: false,
-      status: 500,
-      statusText: 'Internal Server Error',
-    }));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 500, statusText: 'Internal Server Error' })));
 
     const client = new GraphQLClient(options);
     await expect(client.query('{ __typename }')).rejects.toThrow(GraphQLRequestError);
@@ -134,5 +133,106 @@ describe('GraphQLClient', () => {
     const client = new GraphQLClient(options);
     const result = await client.mutation('mutation { productCreate { id } }');
     expect(result.data).toEqual({ productCreate: { id: '1' } });
+  });
+});
+
+/** A store that answers once with this status, body and headers. */
+function answering(status: number, body: unknown, headers: Record<string, string> = {}) {
+  const text = typeof body === 'string' ? body : JSON.stringify(body);
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(text, { status, statusText: 'Status', headers })));
+}
+
+/** What a failed call tells an assistant, as `--json` prints it. */
+async function failure(call: Promise<unknown>) {
+  try {
+    await call;
+  } catch (error) {
+    return toStructuredError(error);
+  }
+  throw new Error('the call did not fail');
+}
+
+describe('GraphQLClient, a store that does not answer (B-548)', () => {
+  const options = { storeUrl: 'https://mystore.cloudcart.com', token: 'cc_pat_test123', timeoutMs: 50 };
+
+  /** A store that takes the request and never answers: the call ends only by its signal. */
+  function hanging() {
+    vi.stubGlobal('fetch', vi.fn((_url: string, init: RequestInit) => new Promise((_resolve, reject) => {
+      init.signal!.addEventListener('abort', () => reject(init.signal!.reason));
+    })));
+  }
+
+  it('ends after the set time with a retryable timeout, exit 7', async () => {
+    hanging();
+    const s = await failure(new GraphQLClient(options).query('{ __typename }'));
+    expect(s).toMatchObject({ type: 'timeout', retryable: true, exitCode: 7 });
+    expect(s.message).toContain('0.05 s');
+  });
+
+  it('never marks a timed-out mutation retryable', async () => {
+    hanging();
+    const s = await failure(new GraphQLClient(options).mutation('mutation { productDelete(id: 1) }'));
+    expect(s).toMatchObject({ type: 'timeout', retryable: false, hint: MUTATION_MAY_HAVE_RUN });
+  });
+
+  it('counts the body too: a body that stops midway ends as a timeout', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => ({
+      ok: true,
+      status: 200,
+      json: () => new Promise((_resolve, reject) => init.signal!.addEventListener('abort', () => reject(init.signal!.reason))),
+    })));
+    expect(await failure(new GraphQLClient(options).query('{ __typename }'))).toMatchObject({ type: 'timeout' });
+  });
+
+  it('waits 60 s by default', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{"data":{}}')));
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    await new GraphQLClient({ storeUrl: options.storeUrl, token: options.token }).query('{ __typename }');
+    expect(timeout).toHaveBeenCalledWith(60_000);
+  });
+});
+
+describe('GraphQLClient, a refused answer (B-549)', () => {
+  const options = { storeUrl: 'https://mystore.cloudcart.com', token: 'cc_pat_test123' };
+
+  it('calls a 503 unavailable and retryable for a query, with the store\'s message, exit 7', async () => {
+    answering(503, { errors: [{ message: 'Down for maintenance' }] });
+    const s = await failure(new GraphQLClient(options).query('{ __typename }'));
+    expect(s).toMatchObject({ type: 'server_unavailable', retryable: true, exitCode: 7 });
+    expect(s.message).toContain('503');
+    expect(s.message).toContain('Down for maintenance');
+  });
+
+  it('never marks a mutation retryable after a 502, 503 or 504', async () => {
+    for (const status of [502, 503, 504]) {
+      answering(status, '<html>gateway</html>');
+      const s = await failure(new GraphQLClient(options).mutation('mutation { productDelete(id: 1) }'));
+      expect(s).toMatchObject({ type: 'server_unavailable', retryable: false, hint: MUTATION_MAY_HAVE_RUN, exitCode: 7 });
+      expect(s.message).not.toContain('<html>');
+    }
+  });
+
+  it('keeps a 500\'s message and does not call it retryable, exit 1', async () => {
+    answering(500, { message: 'Server Error' });
+    const s = await failure(new GraphQLClient(options).query('{ __typename }'));
+    expect(s).toMatchObject({ type: 'http_error', retryable: false, exitCode: 1 });
+    expect(s.message).toBe('GraphQL request failed: 500 Status: Server Error');
+  });
+
+  it('passes on a 429\'s Retry-After, in seconds or as a date', async () => {
+    answering(429, '', { 'Retry-After': '30' });
+    expect(await failure(new GraphQLClient(options).query('{ __typename }'))).toMatchObject({
+      type: 'rate_limited', retryable: true, retryAfterSeconds: 30, exitCode: 6,
+    });
+
+    answering(429, '', { 'Retry-After': new Date(Date.now() + 90_000).toUTCString() });
+    const s = await failure(new GraphQLClient(options).query('{ __typename }'));
+    expect(s.retryAfterSeconds).toBeGreaterThanOrEqual(89);
+    expect(s.retryAfterSeconds).toBeLessThanOrEqual(90);
+  });
+
+  it('says nothing of a wait the store did not name', async () => {
+    answering(429, '');
+    expect(await failure(new GraphQLClient(options).query('{ __typename }'))).not.toHaveProperty('retryAfterSeconds');
   });
 });

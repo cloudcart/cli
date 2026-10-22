@@ -19,8 +19,8 @@ export const EXIT_CODES = {
   2: 'usage error: an unknown flag, a missing argument, invalid variables, or a query that does not parse or validate',
   3: 'file not found (app execute and app validate --file)',
   4: 'authentication/permission denied (the store refused the token)',
-  6: 'rate limited (retryable)',
-  7: 'network error (retryable)',
+  6: 'rate limited (retryable; retryAfterSeconds when the store names the wait)',
+  7: 'the network, a timeout, or the store unavailable (502, 503, 504): retryable unless the document was a mutation',
 };
 
 type Loadable = Command.Loadable;
@@ -108,7 +108,8 @@ export default class Describe extends Command {
             recommended_flags: ['--json', '--compact-output'],
             schema_discovery: 'cloudcart app schema --search <term> --compact',
             full_schema: 'cloudcart app schema --compact',
-            validate_before_execute: 'cloudcart app validate --query <query> --json',
+            validate_without_running:
+              'cloudcart app validate --query <query> --json — for a document not run now; app execute needs no validation first, the store refuses an invalid document before running any of it',
             non_interactive_auth: 'Set CLOUDCART_CLI_TOKEN and CLOUDCART_CLI_STORE env vars',
             nitrogen_workflow: [
               'cloudcart nitrogen init <name>',
