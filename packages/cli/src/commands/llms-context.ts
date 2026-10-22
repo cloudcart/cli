@@ -38,7 +38,7 @@ cloudcart app execute --query 'mutation($input: CreateProductInput!) { createPro
 # From file
 cloudcart app execute --file query.graphql --json
 
-# A heavy query: wait up to 180 s instead of the default 60 (1–600)
+# A heavy query: wait up to 180 s instead of the default 15 (1–600)
 cloudcart app execute --file export.graphql --timeout 180 --json
 \`\`\`
 

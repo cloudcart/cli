@@ -50,7 +50,7 @@ export default class AppExecute extends Command {
       default: false,
     }),
     timeout: Flags.integer({
-      description: "Seconds to wait for the store's answer (default 60)",
+      description: "Seconds to wait for the store's answer (default 15)",
       min: 1,
       max: 600,
     }),

@@ -10,7 +10,7 @@ import {
 import { truncate } from '../output/format.js';
 
 /** How long a call waits for the store's whole answer unless told otherwise (B-548). */
-export const DEFAULT_TIMEOUT_MS = 60_000;
+export const DEFAULT_TIMEOUT_MS = 15_000;
 
 /** The answers that mean "not now" rather than "never": the store, or what stands in front of it, is unavailable. */
 const UNAVAILABLE = new Set([502, 503, 504]);

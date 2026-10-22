@@ -184,11 +184,11 @@ describe('GraphQLClient, a store that does not answer (B-548)', () => {
     expect(await failure(new GraphQLClient(options).query('{ __typename }'))).toMatchObject({ type: 'timeout' });
   });
 
-  it('waits 60 s by default', async () => {
+  it('waits 15 s by default', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('{"data":{}}')));
     const timeout = vi.spyOn(AbortSignal, 'timeout');
     await new GraphQLClient({ storeUrl: options.storeUrl, token: options.token }).query('{ __typename }');
-    expect(timeout).toHaveBeenCalledWith(60_000);
+    expect(timeout).toHaveBeenCalledWith(15_000);
   });
 });
 

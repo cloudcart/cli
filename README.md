@@ -93,7 +93,7 @@ cloudcart app execute --file query.graphql --variables vars.json --json
 # Pipe from stdin
 echo '{ shop { name } }' | cloudcart app execute --compact-output
 
-# Wait longer for a heavy query (seconds, 1–600; the default is 60)
+# Wait longer for a heavy query (seconds, 1–600; the default is 15)
 cloudcart app execute --file export.graphql --timeout 180 --json
 ```
 
