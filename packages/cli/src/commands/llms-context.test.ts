@@ -79,6 +79,19 @@ describe('LlmsContext command', () => {
     expect(output).toContain('extensions.agentHint');
   });
 
+  it("names the store's time zone, the one schema and a plan's limit (T-614)", async () => {
+    const logs: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((msg: string) => { logs.push(msg); });
+
+    await new LlmsContext([], config).run();
+
+    const output = logs.join('\n');
+    expect(output).toMatch(/in the store's own time zone\s+\(`generalSettings \{ timezone \}`\) with no offset/);
+    expect(output).toContain('The schema is the same for every store');
+    expect(output).toContain('plan_limit_reached');
+    expect(output).toContain('extensions.planLimit');
+  });
+
   it('documents the discover-validate-execute workflow', async () => {
     const logs: string[] = [];
     vi.spyOn(console, 'log').mockImplementation((msg: string) => { logs.push(msg); });

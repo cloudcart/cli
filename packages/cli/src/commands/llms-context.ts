@@ -147,6 +147,7 @@ ${Object.entries(EXIT_CODES)
 ## GraphQL API Notes
 
 Checked against a store's schema on 2026-10-22; \`app schema --search <name> --compact\` shows any type or field as the store has it.
+The schema is the same for every store: what a store's plan does not include is refused when it runs (see Errors).
 
 - **Field naming** — output fields are camelCase (\`urlHandle\`, \`shortDescription\`), but a few older ones are snake_case
   (\`OrderHistory.order_id\`). Fields of input objects are mostly snake_case (\`CreateProductInput\`: \`url_handle\`,
@@ -167,13 +168,16 @@ Checked against a store's schema on 2026-10-22; \`app schema --search <name> --c
   - \`Customer\`: \`contact\`, \`verification\`, \`marketingPrefs\`, \`status\`, \`defaults\`, \`timestamps\`
   - \`CartSettings\`: \`registration\`, \`limits\`, \`defaults\`, \`checkoutFields\`, \`maps\`, \`orders\`, \`abandoned\`, \`legal\`
 - **Errors** — each GraphQL error has \`message\`, \`locations\` and \`extensions.agentHint\`: \`reason\` (e.g. \`query_invalid\`),
-  \`nextStep\` (what to do about it) and \`exposeToUser\` (whether the hint may be shown to the merchant).
+  \`nextStep\` (what to do about it) and \`exposeToUser\` (whether the hint may be shown to the merchant). A plan's limit comes back
+  as \`reason: plan_limit_reached\` with \`extensions.planLimit\` (\`feature\`, \`limit\`, \`used\`, \`remaining\`, \`purchaseUrl\`):
+  tell the merchant; retrying does not help.
 - **Enums** are written as the schema has them: many values are UPPER_CASE, but the store's own ones are lower case
   (\`ProductType\`: \`simple | multiple | digital | bundle\`; \`YesNo\`: \`yes | no\`).
 - **Yes/no fields** — most are \`Boolean\`, but some older models use the \`YesNo\` enum: \`Product.flags\` (\`active\`, \`sale\`,
   \`new\`, …; \`featured\` is an \`Int\`) and inputs such as \`CreateProductInput.active\`. Check the field's type.
 - **IDs** are numeric strings (\`"37429"\`), not global IDs.
-- **Dates** — \`DateTime\` is \`Y-m-d H:i:s\` (\`2026-07-14 17:56:22\`), not ISO 8601; \`Date\` is \`Y-m-d\`.
+- **Dates** — \`DateTime\` is \`Y-m-d H:i:s\` (\`2026-07-14 17:56:22\`), not ISO 8601, in the store's own time zone
+  (\`generalSettings { timezone }\`) with no offset in the text; \`Date\` is \`Y-m-d\`.
 - Queries and mutations go to the same endpoint, \`/api/gql\`.
 `;
 
