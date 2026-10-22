@@ -102,7 +102,22 @@ jobs:
             echo "Skipping Homebrew update: cli package.json is $VERSION but release tag is $TAG_VERSION (no new cli published)"
             exit 0
           fi
-          SHA256=$(curl -sL "https://registry.npmjs.org/@cloudcart/cli/-/cli-${VERSION}.tgz" | shasum -a 256 | cut -d' ' -f1)
+          # npm answers 404 for a new version's tarball for minutes after the publish (B-508):
+          # hash it only once the download is that version's package, else fail before touching the tap.
+          REGISTRY=https://registry.npmjs.org
+          TARBALL="${REGISTRY}/@cloudcart/cli/-/cli-${VERSION}.tgz"
+          for ATTEMPT in $(seq 1 40); do
+            if curl -fsSL -o /tmp/cli.tgz "$TARBALL" \
+              && [ "$(tar -xzOf /tmp/cli.tgz package/package.json 2>/dev/null | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version" 2>/dev/null)" = "$VERSION" ]; then
+              break
+            fi
+            if [ "$ATTEMPT" = 40 ]; then
+              echo "npm did not serve @cloudcart/cli@${VERSION}'s tarball within 20 minutes"
+              exit 1
+            fi
+            sleep 30
+          done
+          SHA256=$(shasum -a 256 /tmp/cli.tgz | cut -d' ' -f1)
 
           # Clone tap repo
           git clone https://x-access-token:${GH_TOKEN}@github.com/cloudcart/homebrew-tap.git /tmp/tap
@@ -113,7 +128,7 @@ jobs:
           class Cloudcart < Formula
             desc "AI-first developer CLI for managing CloudCart e-commerce stores"
             homepage "https://github.com/cloudcart/cli"
-            url "https://registry.npmjs.org/@cloudcart/cli/-/cli-${VERSION}.tgz"
+            url "${TARBALL}"
             sha256 "${SHA256}"
             license "MIT"
 
