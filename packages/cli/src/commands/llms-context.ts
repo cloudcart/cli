@@ -26,14 +26,14 @@ Or sign in once without a prompt: \`cloudcart auth login --store mystore.cloudca
 
 ### Execute GraphQL
 \`\`\`bash
-# Inline query — prefer the flat \`nodes\` alternative and grouped sub-types
-cloudcart app execute --query '{ products(first:5) { nodes { id name pricing { from to } flags { active } } totalCount } }' --json
+# Inline query — grouped sub-types (pricing, flags) keep it short; products are paged through edges
+cloudcart app execute --query '{ products(first: 5) { edges { node { id name pricing { from to } flags { active } } } } }' --json
 
 # Pipe from stdin
-echo '{ shop { name } }' | cloudcart app execute --compact-output
+echo '{ generalSettings { siteName } }' | cloudcart app execute --compact-output
 
 # With variables — INPUT fields are still snake_case (Lighthouse @rename remaps outputs only)
-cloudcart app execute --query 'mutation($input: CreateProductInput!) { createProduct(input: $input) { id name } }' --variables '{"input":{"name":"T-Shirt","price_from":29.99}}' --json
+cloudcart app execute --query 'mutation($input: CreateProductInput!) { createProduct(input: $input) { id name } }' --variables '{"input":{"name":"T-Shirt","price":29.99}}' --json
 
 # From file
 cloudcart app execute --file query.graphql --json

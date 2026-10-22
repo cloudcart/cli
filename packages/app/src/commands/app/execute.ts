@@ -15,11 +15,11 @@ export default class AppExecute extends Command {
   static override description = 'Execute a GraphQL query against the Admin API';
 
   static override examples = [
-    "<%= config.bin %> app execute --query '{ products(first: 5) { nodes { id name pricing { from to } } totalCount } }'",
+    "<%= config.bin %> app execute --query '{ products(first: 5) { edges { node { id name pricing { from to } } } } }'",
     '<%= config.bin %> app execute --file query.graphql',
     "<%= config.bin %> app execute --query 'mutation { ... }' --variables '{\"id\": \"123\"}'",
-    "echo '{ shop { name } }' | <%= config.bin %> app execute",
-    '<%= config.bin %> app execute --query "{ orders(first: 10) { nodes { id orderNumber statuses { status } amounts { total } } totalCount } }" --json',
+    "echo '{ generalSettings { siteName } }' | <%= config.bin %> app execute",
+    '<%= config.bin %> app execute --query "{ orders(first: 10) { edges { node { id orderNumber statuses { status } amounts { total } } } } }" --json',
   ];
 
   static override flags = {

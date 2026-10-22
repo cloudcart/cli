@@ -22,7 +22,7 @@ export default class AppValidate extends Command {
   static override examples = [
     "<%= config.bin %> app validate --query '{ products { edges { node { titl } } } }'",
     '<%= config.bin %> app validate --file query.graphql',
-    "echo '{ shop { name } }' | <%= config.bin %> app validate",
+    "echo '{ generalSettings { siteName } }' | <%= config.bin %> app validate",
   ];
 
   static override flags = {

@@ -84,8 +84,12 @@ export class GraphQLClient {
       });
     } catch (error) {
       if (signal.aborted) throw timedOut();
+      // A mutation whose connection broke once the request may have gone is never called retryable (B-553).
       throw new NetworkError(
         `Could not connect to ${this.baseUrl}. ${error instanceof Error ? error.message : ''}`,
+        {
+          mayHaveRun: mutation && !neverSent(error),
+        },
       );
     }
 
@@ -111,13 +115,75 @@ export class GraphQLClient {
       throw new GraphQLRequestError(message, response.status);
     }
 
+    let text: string;
     try {
-      return (await response.json()) as GraphQLResponse<T>;
+      text = await response.text();
     } catch (error) {
       if (signal.aborted) throw timedOut();
       throw error;
     }
+    const body = parseObject(text);
+    if (!body) throw new UnexpectedAnswerError(response);
+    return body as GraphQLResponse<T>;
   }
+}
+
+/** A 2xx answer that is not the API's JSON, such as a page from something in front of the store (B-551). */
+export class UnexpectedAnswerError extends CLIError {
+  constructor(response: Response) {
+    const type = response.headers.get('content-type')?.split(';')[0].trim() || 'no content type';
+    super(`The store answered HTTP ${response.status} with ${type}, not the Admin API's JSON.`, {
+      suggestion: "Check the store's address (--store or CLOUDCART_CLI_STORE).",
+      type: 'unexpected_answer',
+      retryable: false,
+      exitCode: ExitCode.GENERAL,
+    });
+    this.name = 'UnexpectedAnswerError';
+  }
+}
+
+/** The text as a JSON object; nothing for any other text, a JSON array or a bare value included. */
+function parseObject(text: string): Record<string, unknown> | undefined {
+  try {
+    const value: unknown = JSON.parse(text);
+    return typeof value === 'object' && value !== null && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The failures that come before anything is sent: no connection (refused, no such host, unreachable) or a TLS
+ * handshake that refused the certificate. Any other, such as a socket closed after the request (`UND_ERR_SOCKET`),
+ * may have come after the store had the request.
+ */
+const NEVER_SENT = new Set([
+  'ECONNREFUSED',
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'EHOSTUNREACH',
+  'ENETUNREACH',
+  'UND_ERR_CONNECT_TIMEOUT',
+  'DEPTH_ZERO_SELF_SIGNED_CERT',
+  'SELF_SIGNED_CERT_IN_CHAIN',
+  'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+  'UNABLE_TO_GET_ISSUER_CERT_LOCALLY',
+  'CERT_HAS_EXPIRED',
+  'ERR_TLS_CERT_ALTNAME_INVALID',
+]);
+
+/** Whether `fetch`'s failure is one where the request never left: every code of its cause is in `NEVER_SENT`. */
+function neverSent(error: unknown): boolean {
+  const cause = (error as { cause?: { code?: unknown; errors?: Array<{ code?: unknown }> } } | null)
+    ?.cause;
+  const codes = [cause?.code, ...(cause?.errors ?? []).map((e) => e?.code)].filter(
+    (c) => c !== undefined,
+  );
+  return (
+    codes.length > 0 && codes.every((code) => typeof code === 'string' && NEVER_SENT.has(code))
+  );
 }
 
 /** Any other answer the store refused: not retryable, its own message kept. */

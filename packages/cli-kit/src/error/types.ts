@@ -69,8 +69,9 @@ export class CLIError extends Error {
 }
 
 /**
- * A mutation that failed by a timeout or a 502, 503 or 504 may have run on the store before the answer was lost,
- * so it is never marked retryable: sending it again could do its work twice (B-549).
+ * A mutation that failed by a timeout, a 502, 503 or 504, or a connection that broke once the request had gone may have
+ * run on the store before the answer was lost, so it is never marked retryable: sending it again could do its work
+ * twice (B-549, B-553).
  */
 export const MUTATION_MAY_HAVE_RUN =
   'The mutation may have run before the answer was lost: read the record before sending it again.';
@@ -127,11 +128,14 @@ export class ConfigurationError extends CLIError {
 }
 
 export class NetworkError extends CLIError {
-  constructor(message: string) {
+  /** `mayHaveRun`: a mutation whose connection broke once the request may have reached the store (B-553). */
+  constructor(message: string, options?: { mayHaveRun?: boolean }) {
     super(message, {
-      suggestion: 'Check your internet connection and try again.',
+      suggestion: options?.mayHaveRun
+        ? MUTATION_MAY_HAVE_RUN
+        : 'Check your internet connection and try again.',
       type: 'network_error',
-      retryable: true,
+      retryable: !options?.mayHaveRun,
       exitCode: ExitCode.NETWORK,
     });
     this.name = 'NetworkError';

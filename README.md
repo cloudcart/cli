@@ -76,22 +76,22 @@ cloudcart auth login
 
 ```bash
 # Get store info
-cloudcart app execute --query '{ shop { name } }' --json
+cloudcart app execute --query '{ generalSettings { siteName } }' --json
 
 # List products
-cloudcart app execute --query '{ products(first: 5) { edges { node { id title price_from } } } }' --compact-output
+cloudcart app execute --query '{ products(first: 5) { edges { node { id name pricing { from to } } } } }' --compact-output
 
 # Run mutations with variables
 cloudcart app execute \
   --query 'mutation($input: CreateProductInput!) { createProduct(input: $input) { id } }' \
-  --variables '{"input": {"name": "T-Shirt", "price_from": 29.99}}' \
+  --variables '{"input": {"name": "T-Shirt", "price": 29.99}}' \
   --json
 
 # Execute from file
 cloudcart app execute --file query.graphql --variables vars.json --json
 
 # Pipe from stdin
-echo '{ shop { name } }' | cloudcart app execute --compact-output
+echo '{ generalSettings { siteName } }' | cloudcart app execute --compact-output
 
 # Wait longer for a heavy query (seconds, 1–600; the default is 15)
 cloudcart app execute --file export.graphql --timeout 180 --json

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GraphQLClient, GraphQLRequestError } from './graphql-client.js';
 import {
   AuthenticationError,
+  ExitCode,
   MUTATION_MAY_HAVE_RUN,
   NetworkError,
   RateLimitError,
@@ -20,10 +21,7 @@ describe('GraphQLClient', () => {
 
   it('sends a query with correct headers', async () => {
     const mockResponse = { data: { __typename: 'Query' } };
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(mockResponse),
-    }));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(mockResponse))));
 
     const client = new GraphQLClient(options);
     const result = await client.query('{ __typename }');
@@ -42,10 +40,7 @@ describe('GraphQLClient', () => {
   });
 
   it('sends variables when provided', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ data: {} }),
-    }));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: {} }))));
 
     const client = new GraphQLClient(options);
     await client.query('query($id: ID!) { node(id: $id) { id } }', { id: '123' });
@@ -99,10 +94,7 @@ describe('GraphQLClient', () => {
   });
 
   it('strips trailing slash from store URL', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ data: {} }),
-    }));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: {} }))));
 
     const client = new GraphQLClient({ ...options, storeUrl: 'https://mystore.cloudcart.com/' });
     await client.query('{ __typename }');
@@ -112,10 +104,7 @@ describe('GraphQLClient', () => {
   });
 
   it('uses custom API version', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ data: {} }),
-    }));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: {} }))));
 
     const client = new GraphQLClient({ ...options, apiVersion: '2025-10' });
     await client.query('{ __typename }');
@@ -125,10 +114,7 @@ describe('GraphQLClient', () => {
   });
 
   it('mutation delegates to query', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ data: { productCreate: { id: '1' } } }),
-    }));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { productCreate: { id: '1' } } }))));
 
     const client = new GraphQLClient(options);
     const result = await client.mutation('mutation { productCreate { id } }');
@@ -179,7 +165,7 @@ describe('GraphQLClient, a store that does not answer (B-548)', () => {
     vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => ({
       ok: true,
       status: 200,
-      json: () => new Promise((_resolve, reject) => init.signal!.addEventListener('abort', () => reject(init.signal!.reason))),
+      text: () => new Promise((_resolve, reject) => init.signal!.addEventListener('abort', () => reject(init.signal!.reason))),
     })));
     expect(await failure(new GraphQLClient(options).query('{ __typename }'))).toMatchObject({ type: 'timeout' });
   });
@@ -236,3 +222,68 @@ describe('GraphQLClient, a refused answer (B-549)', () => {
     expect(await failure(new GraphQLClient(options).query('{ __typename }'))).not.toHaveProperty('retryAfterSeconds');
   });
 });
+
+describe('GraphQLClient, an answer that is not the API (B-551)', () => {
+  const options = { storeUrl: 'https://mystore.cloudcart.com', token: 'cc_pat_test123' };
+
+  it('names a 200 page that is not JSON by its status and content type, never printing it, exit 1', async () => {
+    answering(200, '<!doctype html><html><body>Welcome</body></html>', { 'Content-Type': 'text/html; charset=UTF-8' });
+    const s = await failure(new GraphQLClient(options).query('{ __typename }'));
+    expect(s).toMatchObject({ type: 'unexpected_answer', retryable: false, exitCode: ExitCode.GENERAL });
+    expect(s.message).toBe("The store answered HTTP 200 with text/html, not the Admin API's JSON.");
+  });
+
+  it('treats a JSON array, a bare value and an empty body the same', async () => {
+    for (const body of ['[1, 2]', '"ok"', '']) {
+      answering(200, body);
+      expect(await failure(new GraphQLClient(options).query('{ __typename }'))).toMatchObject({ type: 'unexpected_answer' });
+    }
+  });
+
+  it('still answers with the API\'s JSON, errors included', async () => {
+    answering(200, { errors: [{ message: 'Cannot query field "x" on type "Query".' }] });
+    expect(await new GraphQLClient(options).query('{ x }')).toEqual({ errors: [{ message: 'Cannot query field "x" on type "Query".' }] });
+  });
+});
+
+describe('GraphQLClient, a connection that broke (B-553)', () => {
+  const options = { storeUrl: 'https://mystore.cloudcart.com', token: 'cc_pat_test123' };
+
+  /** `fetch` failing as Node 24's does: a TypeError whose cause carries the code (measured in T-607). */
+  function failingWith(cause: Record<string, unknown>) {
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      throw new TypeError('fetch failed', { cause });
+    }));
+  }
+
+  it('calls a mutation retryable when nothing was sent: refused, no such host, a refused certificate', async () => {
+    for (const code of ['ECONNREFUSED', 'ENOTFOUND', 'DEPTH_ZERO_SELF_SIGNED_CERT']) {
+      failingWith({ code });
+      expect(await failure(new GraphQLClient(options).mutation('mutation { productDelete(id: 1) }'))).toMatchObject({
+        type: 'network_error', retryable: true, exitCode: 7,
+      });
+    }
+  });
+
+  it('never calls a mutation retryable when the socket closed after the request', async () => {
+    failingWith({ name: 'SocketError', code: 'UND_ERR_SOCKET', message: 'other side closed' });
+    expect(await failure(new GraphQLClient(options).mutation('mutation { productDelete(id: 1) }'))).toMatchObject({
+      type: 'network_error', retryable: false, hint: MUTATION_MAY_HAVE_RUN, exitCode: 7,
+    });
+  });
+
+  it('reads every code of an AggregateError: one that may have sent makes the mutation not retryable', async () => {
+    failingWith({ name: 'AggregateError', errors: [{ code: 'ECONNREFUSED' }, { code: 'ECONNREFUSED' }] });
+    expect((await failure(new GraphQLClient(options).mutation('mutation { a }'))).retryable).toBe(true);
+    failingWith({ name: 'AggregateError', errors: [{ code: 'ECONNREFUSED' }, { code: 'ECONNRESET' }] });
+    expect((await failure(new GraphQLClient(options).mutation('mutation { a }'))).retryable).toBe(false);
+  });
+
+  it('calls a mutation with no code to read not retryable, and a read retryable whatever broke', async () => {
+    failingWith({});
+    expect((await failure(new GraphQLClient(options).mutation('mutation { a }'))).retryable).toBe(false);
+    failingWith({ code: 'UND_ERR_SOCKET' });
+    expect((await failure(new GraphQLClient(options).query('{ a }'))).retryable).toBe(true);
+  });
+});
+
