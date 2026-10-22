@@ -59,6 +59,26 @@ describe('LlmsContext command', () => {
     expect(output).toContain('retryAfterSeconds');
   });
 
+  it("states only what the admin API's schema has (T-608)", async () => {
+    const logs: string[] = [];
+    vi.spyOn(console, 'log').mockImplementation((msg: string) => { logs.push(msg); });
+
+    await new LlmsContext([], config).run();
+
+    const output = logs.join('\n');
+    // Refuted on a store's schema, 2026-10-22.
+    expect(output).not.toContain('Every manual Connection type exposes BOTH');
+    expect(output).not.toMatch(/OrderConnection[^\n]*BOTH/);
+    expect(output).not.toContain('price_from');
+    expect(output).not.toContain('UPPER_CASE at definition-time');
+    expect(output).not.toContain('LIGHTHOUSE_DEBUG');
+    // What holds instead.
+    expect(output).toContain('Lists come in three shapes');
+    expect(output).toContain('pageInfo { total }');
+    expect(output).toContain('(page: 1, perPage: 20)');
+    expect(output).toContain('extensions.agentHint');
+  });
+
   it('documents the discover-validate-execute workflow', async () => {
     const logs: string[] = [];
     vi.spyOn(console, 'log').mockImplementation((msg: string) => { logs.push(msg); });
@@ -93,7 +113,7 @@ describe('LlmsContext command', () => {
 
     const output = logs.join('\n');
     expect(output).toContain('YesNo');
-    expect(output).toContain('pagination');
+    expect(output).toMatch(/pagination/i);
   });
 
   it('documents the Nitrogen workflow and the deployment token (B-487)', async () => {
